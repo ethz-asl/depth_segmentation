@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(iclcv_segmentation)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+add_definitions(-std=c++11)
 
 find_package(catkin_simple REQUIRED)
 
@@ -10,7 +10,7 @@ find_package(Qt5Core)
 SET(ICL_QT_MODULES Core Gui Multimedia Widgets OpenGL)
 
 SET(ICL_ALL_QT_LIBS_FOUND TRUE)
-set(QT_ROOT /usr/local/opt/qt5)
+SET(QT_ROOT /usr/local/opt/qt5)
 FOREACH(M ${ICL_QT_MODULES})
   FIND_PACKAGE(Qt5${M} REQUIRED HINTS ${QT_ROOT})
   IF(NOT Qt5${M}_FOUND)
@@ -24,8 +24,6 @@ ENDFOREACH()
 IF(ICL_ALL_QT_LIBS_FOUND)
   MESSAGE(STATUS "Found: All Qt Modules")
   SET(QT_FOUND TRUE)
-  #set(CMAKE_AUTOMOC ON)
-  #set(CMAKE_INCLUDE_CURRENT_DIR ON)
   add_definitions(${Qt5Widgets_DEFINITIONS})
   IF(NOT WIN32)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
@@ -70,7 +68,7 @@ IF(ICL_ALL_QT_LIBS_FOUND)
     LIST(APPEND Qt5_LIBRARIES ${ICLQt5${M}LibAbs})
   ENDFOREACH()
 ENDIF()
-# message(INFO ${Qt5_LIBRARIES})
+
 include_directories(${Qt5Multimedia_INCLUDE_DIRS}
                     ${Qt5Widgets_INCLUDE_DIRS}
                     ${Qt5OpenGL_INCLUDE_DIRS}
