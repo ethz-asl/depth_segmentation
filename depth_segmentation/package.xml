@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>depth_segmentation</name>
+  <version>0.0.0</version>
+  <description>A package for segmentation using depth images.</description>
+
+  <maintainer email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</maintainer>
+
+  <author>Fadri Furrer</author>
+  <author>Tonci Novkovic</author>
+  <author>Abel Gawel</author>
+  <author>Marius Fehr</author>
+
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+
+  <depend>pcl_catkin</depend>
+  <depend>roscpp</depend>
+</package>
