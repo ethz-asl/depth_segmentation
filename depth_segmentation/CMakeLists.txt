@@ -6,11 +6,16 @@ add_definitions(-std=c++11)
 find_package(catkin_simple REQUIRED)
 
 catkin_simple(ALL_DEPS_REQUIRED)
+
+cs_add_library(${PROJECT_NAME}
+  src/depth_segmentation.cpp
+)
+
+# add_definitions(-DDISPLAY_DEPTH_IMAGES)
 cs_add_executable(${PROJECT_NAME}_node
   src/depth_segmentation_node.cpp
 )
-
-target_link_libraries(${PROJECT_NAME}_node)
+target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
 
 cs_install()
 cs_export()

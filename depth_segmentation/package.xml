@@ -5,17 +5,24 @@
   <description>A package for segmentation using depth images.</description>
 
   <maintainer email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</maintainer>
-
+  <maintainer email="marius.fehr@mavt.ethz.ch">Marius Fehr</maintainer>
+  <maintainer email="tonci.novkovic@mavt.ethz.ch">Tonci Novkovic</maintainer>
   <author>Fadri Furrer</author>
+  <author>Marius Fehr</author>
   <author>Tonci Novkovic</author>
   <author>Abel Gawel</author>
-  <author>Marius Fehr</author>
-
-  <license>TODO</license>
+  <license>BSD</license>
 
   <buildtool_depend>catkin</buildtool_depend>
   <buildtool_depend>catkin_simple</buildtool_depend>
 
+  <depend>cv_bridge</depend>
+  <depend>eigen_catkin</depend>
+  <depend>gflags_catkin</depend>
+  <depend>glog_catkin</depend>
+  <depend>image_transport</depend>
+  <depend>opencv3_catkin</depend>
   <depend>pcl_catkin</depend>
   <depend>roscpp</depend>
+  <depend>tf</depend>
 </package>
