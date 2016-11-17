@@ -64,29 +64,34 @@ class DepthSegmentationNode {
   message_filters::Synchronizer<ImageSyncPolicy> image_sync_policy_;
   message_filters::Synchronizer<CameraInfoSyncPolicy> camera_info_sync_policy_;
 
-  void publish_tf(cv::Mat cv_transform) {
-    tf::Transform transform;
+  void publish_tf(const cv::Mat cv_transform, const ros::Time& timestamp) {
+    // Rotate such that the world frame initially aligns with the camera_link
+    // frame.
+    static const cv::Mat kWorldAlign =
+        (cv::Mat_<double>(4, 4) << 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0,
+         1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+    cv::Mat cv_transform_world_aligned = cv_transform * kWorldAlign;
 
-    tf::Vector3 translation_tf(cv_transform.at<double>(0, 3),
-                               cv_transform.at<double>(1, 3),
-                               cv_transform.at<double>(2, 3));
+    tf::Vector3 translation_tf(cv_transform_world_aligned.at<double>(0, 3),
+                               cv_transform_world_aligned.at<double>(1, 3),
+                               cv_transform_world_aligned.at<double>(2, 3));
 
     tf::Matrix3x3 rotation_tf;
-    for (size_t i = 0; i < 3; ++i) {
-      for (size_t j = 0; j < 3; ++j) {
-        rotation_tf[j][i] = cv_transform.at<double>(j, i);
+    for (size_t i = 0u; i < 3u; ++i) {
+      for (size_t j = 0u; j < 3u; ++j) {
+        rotation_tf[j][i] = cv_transform_world_aligned.at<double>(j, i);
       }
     }
-
+    tf::Transform transform;
     transform.setOrigin(translation_tf);
     transform.setBasis(rotation_tf);
 
     // TODO(ff): Move outside.
-    const static std::string world_frame_name = "world";
-    const static std::string camera_frame_name = "camera_link";
+    const static std::string parent_frame = "camera_rgb_optical_frame";
+    const static std::string child_frame = "world";
 
-    transform_broadcaster_.sendTransform(tf::StampedTransform(
-        transform, ros::Time::now(), world_frame_name, camera_frame_name));
+    transform_broadcaster_.sendTransform(
+        tf::StampedTransform(transform, timestamp, parent_frame, child_frame));
   }
 
   void imageCallback(const sensor_msgs::Image::ConstPtr& depth_msg,
@@ -95,8 +100,9 @@ class DepthSegmentationNode {
       cv_bridge::CvImagePtr cv_depth_image;
       cv_depth_image = cv_bridge::toCvCopy(
           depth_msg, sensor_msgs::image_encodings::TYPE_16UC1);
-      cv_depth_image->image.convertTo(cv_depth_image->image, CV_32FC1,
-                                      1.f / 5000.f);
+
+      cv::rgbd::rescaleDepth(cv_depth_image->image, CV_32F,
+                             cv_depth_image->image);
 
       cv_bridge::CvImagePtr cv_rgb_image;
       cv_rgb_image =
@@ -104,55 +110,51 @@ class DepthSegmentationNode {
       cv::Mat bw_image(cv_rgb_image->image.size(), CV_8UC1);
 
       cvtColor(cv_rgb_image->image, bw_image, cv::COLOR_RGB2GRAY);
-      // cv_rgb_image->image.convertTo(cv_rgb_image->image, CV_8UC1);
+
+      cv::Mat mask(bw_image.size(), CV_8UC1,
+                   cv::Scalar(depth_segmentation::CameraTracker::kImageRange));
 
       if (!camera_tracker_.getRgbImage().empty() &&
           !camera_tracker_.getDepthImage().empty()) {
+#ifdef WRITE_IMAGES
+        cv::imwrite(std::to_string(cv_rgb_image->header.stamp.toSec()) +
+                        "_rgb_image.png",
+                    cv_rgb_image->image);
+        cv::imwrite(std::to_string(cv_rgb_image->header.stamp.toSec()) +
+                        "_bw_image.png",
+                    bw_image);
+        cv::imwrite(std::to_string(depth_msg->header.stamp.toSec()) +
+                        "_depth_image.png",
+                    cv_depth_image->image);
+        cv::imwrite(
+            std::to_string(depth_msg->header.stamp.toSec()) + "_depth_mask.png",
+            mask);
+#endif  // WRITE_IMAGES
+
 #ifdef DISPLAY_DEPTH_IMAGES
-        // Place both depth images into one.
-        cv::Mat old_depth_image = camera_tracker_.getDepthImage();
-        cv::Mat new_depth_image = cv_depth_image->image;
-        cv::Size size_old_depth = old_depth_image.size();
-        cv::Size size_new_depth = new_depth_image.size();
-        cv::Mat combined_depth(size_old_depth.height,
-                               size_old_depth.width + size_new_depth.width,
-                               CV_32FC1);
-        cv::Mat left(combined_depth, cv::Rect(0, 0, size_old_depth.width,
-                                              size_old_depth.height));
-        old_depth_image.copyTo(left);
-        cv::Mat right(combined_depth,
-                      cv::Rect(size_old_depth.width, 0, size_new_depth.width,
-                               size_new_depth.height));
-        new_depth_image.copyTo(right);
-
-        // Adjust the colors, such that the depth images look nicer.
-        double min;
-        double max;
-        cv::minMaxIdx(combined_depth, &min, &max);
-        combined_depth -= min;
-        cv::Mat adjusted_depth;
-        cv::convertScaleAbs(combined_depth, adjusted_depth,
-                            255.0 / double(max - min));
-
-        cv::imshow("Depth Images", adjusted_depth);
-        cv::waitKey(0);
+        camera_tracker_.visualize(camera_tracker_.getDepthImage(),
+                                  cv_depth_image->image);
 #endif  // DISPLAY_DEPTH_IMAGES
 
         // Compute transform from tracker.
-        if (camera_tracker_.computeTransform(bw_image, cv_depth_image->image)) {
-          // LOG(INFO) << camera_tracker_.getTransform();
-          publish_tf(camera_tracker_.getWorldTransform());
+        if (camera_tracker_.computeTransform(bw_image, cv_depth_image->image,
+                                             mask)) {
+          publish_tf(camera_tracker_.getWorldTransform(),
+                     depth_msg->header.stamp);
+
           // Update the member images to the new images.
           // TODO(ff): Consider only doing this, when we are far enough away
           // from a frame. (Which basically means we would set a keyframe.)
           camera_tracker_.setRgbImage(bw_image);
           camera_tracker_.setDepthImage(cv_depth_image->image);
+          camera_tracker_.setDepthMask(mask);
         } else {
           LOG(ERROR) << "Failed to compute Transform.";
         }
       } else {
         camera_tracker_.setRgbImage(bw_image);
         camera_tracker_.setDepthImage(cv_depth_image->image);
+        camera_tracker_.setDepthMask(mask);
       }
     }
   }
@@ -185,12 +187,11 @@ class DepthSegmentationNode {
     K_rgb.at<float>(1, 1) = rgb_info.K[4];
     K_rgb.at<float>(1, 2) = rgb_info.K[5];
     K_rgb.at<float>(2, 2) = rgb_info.K[8];
-    // const static std::string kOdometryMethod = "RgbdICPOdometry";
-    const static std::string kOdometryMethod = "RgbdOdometry";
-    // const static std::string kOdometryMethod = "ICPOdometry";
 
-    camera_tracker_.initialize(depth_image_size.x(), depth_image_size.y(),
-                               K_rgb, K_depth, kOdometryMethod);
+    camera_tracker_.initialize(
+        depth_image_size.x(), depth_image_size.y(), K_rgb, K_depth,
+        camera_tracker_.kCameraTrackerNames
+            [camera_tracker_.CameraTrackerType::kRgbdICPOdometry]);
 
     camera_info_ready_ = true;
   }
@@ -198,9 +199,6 @@ class DepthSegmentationNode {
 
 int main(int argc, char** argv) {
   ros::init(argc, argv, "depth_segmentation_node");
-#ifdef DISPLAY_DEPTH_IMAGES
-  cv::namedWindow("Depth Images", cv::WINDOW_AUTOSIZE);
-#endif  // DISPLAY_DEPTH_IMAGES
   DepthSegmentationNode depth_segmentation_node;
 
   while (ros::ok()) {

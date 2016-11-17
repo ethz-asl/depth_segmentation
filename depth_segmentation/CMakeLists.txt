@@ -11,6 +11,7 @@ cs_add_library(${PROJECT_NAME}
   src/depth_segmentation.cpp
 )
 
+# add_definitions(-DWRITE_IMAGES)
 # add_definitions(-DDISPLAY_DEPTH_IMAGES)
 cs_add_executable(${PROJECT_NAME}_node
   src/depth_segmentation_node.cpp

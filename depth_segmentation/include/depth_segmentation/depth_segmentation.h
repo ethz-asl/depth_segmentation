@@ -1,4 +1,3 @@
-
 #ifndef DEPTH_SEGMENTATION_DEPTH_SEGMENTATION_H_
 #define DEPTH_SEGMENTATION_DEPTH_SEGMENTATION_H_
 
@@ -8,21 +7,42 @@
 
 namespace depth_segmentation {
 
+static const std::string kDebugWindowName = "DebugImages";
 class CameraTracker {
  public:
   CameraTracker();
   void initialize(const size_t width, const size_t height,
                   const cv::Mat& rgb_camera_matrix,
                   const cv::Mat& depth_camera_matrix,
-                  const std::string odometry_type = "RgbdICPOdometry");
+                  const std::string odometry_type);
+
+  void initialize(const size_t width, const size_t height,
+                  const cv::Mat& rgb_camera_matrix,
+                  const cv::Mat& depth_camera_matrix) {
+    return initialize(width, height, rgb_camera_matrix, depth_camera_matrix,
+                      kCameraTrackerNames[CameraTrackerType::kRgbdICPOdometry]);
+  }
 
   bool computeTransform(const cv::Mat& src_rgb_image,
                         const cv::Mat& src_depth_image,
                         const cv::Mat& dst_rgb_image,
-                        const cv::Mat& dst_depth_image);
+                        const cv::Mat& dst_depth_image,
+                        const cv::Mat& src_depth_mask,
+                        const cv::Mat& dst_depth_mask);
+  bool computeTransform(const cv::Mat& dst_rgb_image,
+                        const cv::Mat& dst_depth_image,
+                        const cv::Mat& dst_depth_mask) {
+    return computeTransform(rgb_image_, depth_image_, dst_rgb_image,
+                            dst_depth_image, depth_mask_, dst_depth_mask);
+  }
+  void createMask(const cv::Mat& depth, cv::Mat* mask);
+  void dilateFrame(cv::Mat& image, cv::Mat& depth);
 
   inline void setDepthImage(const cv::Mat& depth_image) {
     depth_image_ = depth_image;
+  }
+  inline void setDepthMask(const cv::Mat& depth_mask) {
+    depth_mask_ = depth_mask;
   }
   inline void setRgbImage(const cv::Mat& rgb_image) { rgb_image_ = rgb_image; }
   inline void setDepthCameraMatrix(const cv::Mat& camera_matrix) {
@@ -31,16 +51,25 @@ class CameraTracker {
   inline void setRgbCameraMatrix(const cv::Mat& camera_matrix) {
     rgb_camera_matrix_ = camera_matrix;
   }
-  inline cv::Mat getTransform() { return transform_; }
-  inline cv::Mat getWorldTransform() { return world_transform_; }
-  inline cv::Mat getRgbImage() { return rgb_image_; }
-  inline cv::Mat getDepthImage() { return depth_image_; }
+  inline cv::Mat getTransform() const { return transform_; }
+  inline cv::Mat getWorldTransform() const { return world_transform_; }
+  inline cv::Mat getRgbImage() const { return rgb_image_; }
+  inline cv::Mat getDepthImage() const { return depth_image_; }
+  inline cv::Mat getDepthMask() const { return depth_mask_; }
 
-  bool computeTransform(const cv::Mat& dst_rgb_image,
-                        const cv::Mat& dst_depth_image) {
-    return computeTransform(rgb_image_, depth_image_, dst_rgb_image,
-                            dst_depth_image);
-  }
+  void visualize(const cv::Mat old_depth_image,
+                 const cv::Mat new_depth_image) const;
+
+  enum CameraTrackerType {
+    kRgbdICPOdometry = 0,
+    kRgbdOdometry = 1,
+    kICPOdometry = 2,
+  };
+  static constexpr size_t kImageRange = 255;
+  static constexpr double kMinDepth = 0.15;
+  static constexpr double kMaxDepth = 10.0;
+  const std::vector<std::string> kCameraTrackerNames = {
+      "RgbdICPOdometry", "RgbdOdometry", "ICPOdometry"};
 
  private:
   cv::Mat depth_camera_matrix_;
@@ -48,6 +77,7 @@ class CameraTracker {
   cv::Ptr<cv::rgbd::Odometry> odometry_;
   cv::Mat rgb_image_;
   cv::Mat depth_image_;
+  cv::Mat depth_mask_;
   cv::Mat transform_;
   cv::Mat world_transform_;
 };
