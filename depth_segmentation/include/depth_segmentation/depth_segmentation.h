@@ -5,9 +5,10 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/rgbd.hpp>
 
+#include "depth_segmentation/common.h"
+
 namespace depth_segmentation {
 
-static const std::string kDebugWindowName = "DebugImages";
 class CameraTracker {
  public:
   CameraTracker();

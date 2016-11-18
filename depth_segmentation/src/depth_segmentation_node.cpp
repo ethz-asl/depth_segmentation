@@ -7,7 +7,6 @@
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/synchronizer.h>
-#include <ros/ros.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
@@ -17,7 +16,8 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <depth_segmentation/depth_segmentation.h>
+#include "depth_segmentation/depth_segmentation.h"
+#include "depth_segmentation/ros_common.h"
 
 class DepthSegmentationNode {
  public:
@@ -25,10 +25,12 @@ class DepthSegmentationNode {
       : node_handle_("~"),
         image_transport_(node_handle_),
         camera_info_ready_(false),
-        depth_image_sub_(image_transport_, "/camera/depth/image_raw", 1),
-        rgb_image_sub_(image_transport_, "/camera/rgb/image_raw", 1),
-        depth_info_sub_(node_handle_, "/camera/depth/camera_info", 1),
-        rgb_info_sub_(node_handle_, "/camera/rgb/camera_info", 1),
+        depth_image_sub_(image_transport_, depth_segmentation::kDepthImageTopic,
+                         1),
+        rgb_image_sub_(image_transport_, depth_segmentation::kRgbImageTopic, 1),
+        depth_info_sub_(node_handle_, depth_segmentation::kDepthCameraInfoTopic,
+                        1),
+        rgb_info_sub_(node_handle_, depth_segmentation::kRgbCameraInfoTopic, 1),
         image_sync_policy_(ImageSyncPolicy(10), depth_image_sub_,
                            rgb_image_sub_),
         camera_info_sync_policy_(CameraInfoSyncPolicy(10), depth_info_sub_,
@@ -86,12 +88,9 @@ class DepthSegmentationNode {
     transform.setOrigin(translation_tf);
     transform.setBasis(rotation_tf);
 
-    // TODO(ff): Move outside.
-    const static std::string parent_frame = "camera_rgb_optical_frame";
-    const static std::string child_frame = "world";
-
-    transform_broadcaster_.sendTransform(
-        tf::StampedTransform(transform, timestamp, parent_frame, child_frame));
+    transform_broadcaster_.sendTransform(tf::StampedTransform(
+        transform, timestamp, depth_segmentation::kTfDepthCameraFrame,
+        depth_segmentation::kTfWorldFrame));
   }
 
   void imageCallback(const sensor_msgs::Image::ConstPtr& depth_msg,
