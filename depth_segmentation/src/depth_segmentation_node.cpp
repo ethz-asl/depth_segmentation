@@ -54,8 +54,11 @@ class DepthSegmentationNode {
       CameraInfoSyncPolicy;
 
   bool camera_info_ready_;
+  depth_segmentation::DepthCamera depth_camera_;
+  depth_segmentation::RgbCamera rgb_camera_;
 
   depth_segmentation::CameraTracker camera_tracker_;
+  depth_segmentation::DepthSegmenter depth_segmenter_;
 
   message_filters::Subscriber<sensor_msgs::CameraInfo> depth_info_sub_;
   message_filters::Subscriber<sensor_msgs::CameraInfo> rgb_info_sub_;
@@ -112,7 +115,6 @@ class DepthSegmentationNode {
 
       cv::Mat mask(bw_image.size(), CV_8UC1,
                    cv::Scalar(depth_segmentation::CameraTracker::kImageRange));
-
       if (!camera_tracker_.getRgbImage().empty() &&
           !camera_tracker_.getDepthImage().empty()) {
 #ifdef WRITE_IMAGES
@@ -144,16 +146,16 @@ class DepthSegmentationNode {
           // Update the member images to the new images.
           // TODO(ff): Consider only doing this, when we are far enough away
           // from a frame. (Which basically means we would set a keyframe.)
-          camera_tracker_.setRgbImage(bw_image);
-          camera_tracker_.setDepthImage(cv_depth_image->image);
-          camera_tracker_.setDepthMask(mask);
+          depth_camera_.setImage(cv_depth_image->image);
+          depth_camera_.setMask(mask);
+          rgb_camera_.setImage(bw_image);
         } else {
           LOG(ERROR) << "Failed to compute Transform.";
         }
       } else {
-        camera_tracker_.setRgbImage(bw_image);
-        camera_tracker_.setDepthImage(cv_depth_image->image);
-        camera_tracker_.setDepthMask(mask);
+        depth_camera_.setImage(cv_depth_image->image);
+        depth_camera_.setMask(mask);
+        rgb_camera_.setImage(bw_image);
       }
     }
   }
@@ -176,6 +178,9 @@ class DepthSegmentationNode {
     K_depth.at<float>(1, 2) = depth_info.K[5];
     K_depth.at<float>(2, 2) = depth_info.K[8];
 
+    depth_camera_.initialize(depth_image_size.x(), depth_image_size.y(),
+                             CV_32FC1, K_depth);
+
     sensor_msgs::CameraInfo rgb_info;
     rgb_info = *rgb_camera_info_msg;
     Eigen::Vector2d rgb_image_size(rgb_info.width, rgb_info.height);
@@ -187,8 +192,13 @@ class DepthSegmentationNode {
     K_rgb.at<float>(1, 2) = rgb_info.K[5];
     K_rgb.at<float>(2, 2) = rgb_info.K[8];
 
+    rgb_camera_.initialize(rgb_image_size.x(), rgb_image_size.y(), CV_8UC1,
+                           K_rgb);
+
+    depth_segmenter_.initialize(depth_camera_);
+
     camera_tracker_.initialize(
-        depth_image_size.x(), depth_image_size.y(), K_rgb, K_depth,
+        depth_camera_, rgb_camera_,
         camera_tracker_.kCameraTrackerNames
             [camera_tracker_.CameraTrackerType::kRgbdICPOdometry]);
 

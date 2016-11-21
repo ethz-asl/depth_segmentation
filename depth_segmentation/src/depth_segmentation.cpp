@@ -11,10 +11,10 @@ void CameraTracker::initialize(const size_t width, const size_t height,
                                const cv::Mat& rgb_camera_matrix,
                                const cv::Mat& depth_camera_matrix,
                                const std::string odometry_type) {
-  depth_camera_matrix_ = depth_camera_matrix;
-  rgb_camera_matrix_ = rgb_camera_matrix;
+  depth_camera_->setCameraMatrix(depth_camera_matrix);
+  rgb_camera_->setCameraMatrix(rgb_camera_matrix);
   odometry_ = cv::rgbd::Odometry::create(odometry_type);
-  odometry_->setCameraMatrix(depth_camera_matrix_);
+  odometry_->setCameraMatrix(depth_camera_->getCameraMatrix());
   world_transform_ = cv::Mat::eye(4, 4, CV_64FC1);
   transform_ = cv::Mat::eye(4, 4, CV_64FC1);
 #ifdef DISPLAY_DEPTH_IMAGES
@@ -137,5 +137,23 @@ void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
       }
     }
   }
+}
+
+void DepthSegmenter::initialize(DepthCamera& depth_camera) {
+  setDepthCamera(depth_camera);
+  rgbd_normals_ = cv::rgbd::RgbdNormals(depth_camera_->getWidth(),
+                                        depth_camera_->getHeight(), CV_32FC1,
+                                        depth_camera_->getCameraMatrix());
+}
+
+void DepthSegmenter::depthMap(const cv::Mat& depth_image, cv::Mat* depth_map) {
+  cv::rgbd::depthTo3d(depth_image, depth_camera_->getCameraMatrix(),
+                      *depth_map);
+}
+
+void DepthSegmenter::normalMap(const cv::Mat& depth_map, cv::Mat* normal_map) {
+  CHECK(!depth_map.empty());
+  CHECK(depth_map.type() == CV_32FC1);
+  rgbd_normals_(depth_map, *normal_map);
 }
 }
