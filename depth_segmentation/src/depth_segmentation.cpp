@@ -11,6 +11,12 @@ void CameraTracker::initialize(const size_t width, const size_t height,
                                const cv::Mat& rgb_camera_matrix,
                                const cv::Mat& depth_camera_matrix,
                                const std::string odometry_type) {
+  CHECK(width > 0);
+  CHECK(height > 0);
+  CHECK(!rgb_camera_matrix.empty());
+  CHECK(!depth_camera_matrix.empty());
+  CHECK(std::find(kCameraTrackerNames.begin(), kCameraTrackerNames.end(),
+                  odometry_type) != kCameraTrackerNames.end());
   depth_camera_->setCameraMatrix(depth_camera_matrix);
   rgb_camera_->setCameraMatrix(rgb_camera_matrix);
   odometry_ = cv::rgbd::Odometry::create(odometry_type);
@@ -146,14 +152,20 @@ void DepthSegmenter::initialize(DepthCamera& depth_camera) {
                                         depth_camera_->getCameraMatrix());
 }
 
-void DepthSegmenter::depthMap(const cv::Mat& depth_image, cv::Mat* depth_map) {
+void DepthSegmenter::computeDepthMap(const cv::Mat& depth_image,
+                                     cv::Mat* depth_map) {
+  CHECK(!depth_image.empty());
+  CHECK(depth_image.type() == CV_32FC1);
+  CHECK_NOTNULL(depth_map);
   cv::rgbd::depthTo3d(depth_image, depth_camera_->getCameraMatrix(),
                       *depth_map);
 }
 
-void DepthSegmenter::normalMap(const cv::Mat& depth_map, cv::Mat* normal_map) {
+void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
+                                      cv::Mat* normal_map) {
   CHECK(!depth_map.empty());
   CHECK(depth_map.type() == CV_32FC1);
+  CHECK_NOTNULL(normal_map);
   rgbd_normals_(depth_map, *normal_map);
 }
 }

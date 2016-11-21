@@ -26,11 +26,15 @@ class Camera {
     camera_matrix_ = camera_matrix;
   }
   inline void setCameraMatrix(const cv::Mat& camera_matrix) {
+    CHECK(!camera_matrix.empty());
     camera_matrix_ = camera_matrix;
   }
   virtual void setImage(const cv::Mat& image) = 0;
   inline void setMask(const cv::Mat& mask) { mask_ = mask; }
-  inline void setType(const int type) { type_ = type; }
+  inline void setType(const int type) {
+    CHECK(type == CV_8UC1 || type == CV_32FC1);
+    type_ = type;
+  }
   inline cv::Mat getCameraMatrix() const { return camera_matrix_; }
   inline cv::Mat getImage() const { return image_; }
   inline cv::Mat getMask() const { return mask_; }
@@ -140,7 +144,7 @@ class CameraTracker {
   enum CameraTrackerType {
     kRgbdICPOdometry = 0,
     kRgbdOdometry = 1,
-    kICPOdometry = 2,
+    kICPOdometry = 2
   };
   static constexpr size_t kImageRange = 255;
   static constexpr double kMinDepth = 0.15;
@@ -160,13 +164,13 @@ class DepthSegmenter {
  public:
   DepthSegmenter(){};
   void initialize(DepthCamera& depth_camera);
-  void depthMap(const cv::Mat& depth_image, cv::Mat* depth_map);
-  void maxDistanceMap(const cv::Mat& image, cv::Mat* distance_map);
-  void normalMap(const cv::Mat& depth_map, cv::Mat* normal_map);
-  void minConcavityMap(const cv::Mat& image, cv::Mat* concavity_map);
-  void concavityAwareNormalMap(const cv::Mat& concavity_map,
-                               const cv::Mat& normal_map,
-                               cv::Mat* combined_map);
+  void computeDepthMap(const cv::Mat& depth_image, cv::Mat* depth_map);
+  void computeMaxDistanceMap(const cv::Mat& image, cv::Mat* distance_map);
+  void computeNormalMap(const cv::Mat& depth_map, cv::Mat* normal_map);
+  void computeMinConcavityMap(const cv::Mat& image, cv::Mat* concavity_map);
+  void convertToConcavityAwareNormalMap(const cv::Mat& concavity_map,
+                                        const cv::Mat& normal_map,
+                                        cv::Mat* combined_map);
   void edgeMap(const cv::Mat& image, cv::Mat* edge_map);
   void labelMap(const cv::Mat& edge_map, cv::Mat* labeled_map);
   inline void setDepthCamera(DepthCamera& depth_camera) {
