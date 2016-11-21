@@ -103,8 +103,8 @@ class DepthSegmentationNode {
       cv_depth_image = cv_bridge::toCvCopy(
           depth_msg, sensor_msgs::image_encodings::TYPE_16UC1);
 
-      cv::rgbd::rescaleDepth(cv_depth_image->image, CV_32F,
-                             cv_depth_image->image);
+      cv::Mat rescaled_depth(cv_depth_image->image.size(), CV_32FC1);
+      cv::rgbd::rescaleDepth(cv_depth_image->image, CV_32FC1, rescaled_depth);
 
       cv_bridge::CvImagePtr cv_rgb_image;
       cv_rgb_image =
@@ -126,7 +126,7 @@ class DepthSegmentationNode {
                     bw_image);
         cv::imwrite(std::to_string(depth_msg->header.stamp.toSec()) +
                         "_depth_image.png",
-                    cv_depth_image->image);
+                    rescaled_depth);
         cv::imwrite(
             std::to_string(depth_msg->header.stamp.toSec()) + "_depth_mask.png",
             mask);
@@ -134,32 +134,31 @@ class DepthSegmentationNode {
 
 #ifdef DISPLAY_DEPTH_IMAGES
         camera_tracker_.visualize(camera_tracker_.getDepthImage(),
-                                  cv_depth_image->image);
+                                  rescaled_depth);
 #endif  // DISPLAY_DEPTH_IMAGES
 
         // Compute transform from tracker.
-        if (camera_tracker_.computeTransform(bw_image, cv_depth_image->image,
-                                             mask)) {
+        if (camera_tracker_.computeTransform(bw_image, rescaled_depth, mask)) {
           publish_tf(camera_tracker_.getWorldTransform(),
                      depth_msg->header.stamp);
 
           cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
                             CV_32FC3);
-          depth_segmenter_.depthMap(cv_depth_image->image, &depth_map);
+          depth_segmenter_.depthMap(rescaled_depth, &depth_map);
           cv::Mat normal_map;
           depth_segmenter_.normalMap(depth_map, &normal_map);
 
           // Update the member images to the new images.
           // TODO(ff): Consider only doing this, when we are far enough away
           // from a frame. (Which basically means we would set a keyframe.)
-          depth_camera_.setImage(cv_depth_image->image);
+          depth_camera_.setImage(rescaled_depth);
           depth_camera_.setMask(mask);
           rgb_camera_.setImage(bw_image);
         } else {
           LOG(ERROR) << "Failed to compute Transform.";
         }
       } else {
-        depth_camera_.setImage(cv_depth_image->image);
+        depth_camera_.setImage(rescaled_depth);
         depth_camera_.setMask(mask);
         rgb_camera_.setImage(bw_image);
       }

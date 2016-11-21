@@ -57,6 +57,8 @@ void CameraTracker::visualize(const cv::Mat old_depth_image,
   CHECK(!old_depth_image.empty());
   CHECK(!new_depth_image.empty());
   CHECK_EQ(old_depth_image.size(), new_depth_image.size());
+  CHECK(old_depth_image.type() == CV_32FC1);
+  CHECK(new_depth_image.type() == CV_32FC1);
 
   // Place both depth images into one.
   cv::Size size_old_depth = old_depth_image.size();
@@ -74,14 +76,15 @@ void CameraTracker::visualize(const cv::Mat old_depth_image,
   // Adjust the colors, such that the depth images look nicer.
   double min;
   double max;
-  cv::minMaxIdx(combined_depth, &min, &max);
+  cv::minMaxIdx(combined_depth, &min, &max, 0, 0,
+                cv::Mat(combined_depth == combined_depth));
   combined_depth -= min;
   cv::Mat adjusted_depth;
   cv::convertScaleAbs(combined_depth, adjusted_depth,
                       (double)kImageRange / double(max - min));
 
   cv::imshow(kDebugWindowName, adjusted_depth);
-  cv::waitKey(0);
+  cv::waitKey(1);
 }
 
 void CameraTracker::createMask(const cv::Mat& depth, cv::Mat* mask) {
@@ -164,7 +167,7 @@ void DepthSegmenter::normalMap(const cv::Mat& depth_map, cv::Mat* normal_map) {
   rgbd_normals_(depth_map, *normal_map);
 #ifdef DISPLAY_NORMAL_IMAGES
   imshow(kDebugWindowName, *normal_map);
-  cv::waitKey(0);
+  cv::waitKey(1);
 #endif  // DISPLAY_NORMAL_IMAGES
 }
 }
