@@ -181,6 +181,7 @@ class DepthSegmenter {
   DepthCamera* depth_camera_;
 
   cv::rgbd::RgbdNormals rgbd_normals_;
+  static constexpr size_t kNormalWindowSize = 7;
 };
 }
 

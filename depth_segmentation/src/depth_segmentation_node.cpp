@@ -143,6 +143,12 @@ class DepthSegmentationNode {
           publish_tf(camera_tracker_.getWorldTransform(),
                      depth_msg->header.stamp);
 
+          cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
+                            CV_32FC3);
+          depth_segmenter_.depthMap(cv_depth_image->image, &depth_map);
+          cv::Mat normal_map;
+          depth_segmenter_.normalMap(depth_map, &normal_map);
+
           // Update the member images to the new images.
           // TODO(ff): Consider only doing this, when we are far enough away
           // from a frame. (Which basically means we would set a keyframe.)

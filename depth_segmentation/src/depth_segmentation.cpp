@@ -141,19 +141,30 @@ void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
 
 void DepthSegmenter::initialize(DepthCamera& depth_camera) {
   setDepthCamera(depth_camera);
-  rgbd_normals_ = cv::rgbd::RgbdNormals(depth_camera_->getWidth(),
-                                        depth_camera_->getHeight(), CV_32FC1,
-                                        depth_camera_->getCameraMatrix());
+  rgbd_normals_ = cv::rgbd::RgbdNormals(
+      depth_camera_->getWidth(), depth_camera_->getHeight(), CV_32FC1,
+      depth_camera_->getCameraMatrix(), kNormalWindowSize);
 }
 
 void DepthSegmenter::depthMap(const cv::Mat& depth_image, cv::Mat* depth_map) {
+  CHECK(!depth_image.empty());
+  CHECK(depth_map);
+  CHECK_EQ(depth_image.size(), depth_map->size());
+  CHECK(depth_map->type() == CV_32FC3);
+
   cv::rgbd::depthTo3d(depth_image, depth_camera_->getCameraMatrix(),
                       *depth_map);
 }
 
 void DepthSegmenter::normalMap(const cv::Mat& depth_map, cv::Mat* normal_map) {
   CHECK(!depth_map.empty());
-  CHECK(depth_map.type() == CV_32FC1);
+  CHECK(depth_map.type() == CV_32FC3);
+  CHECK(normal_map);
+
   rgbd_normals_(depth_map, *normal_map);
+#ifdef DISPLAY_NORMAL_IMAGES
+  imshow(kDebugWindowName, *normal_map);
+  cv::waitKey(0);
+#endif  // DISPLAY_NORMAL_IMAGES
 }
 }
