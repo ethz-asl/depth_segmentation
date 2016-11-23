@@ -34,7 +34,11 @@ class DepthSegmentationNode {
         image_sync_policy_(ImageSyncPolicy(10), depth_image_sub_,
                            rgb_image_sub_),
         camera_info_sync_policy_(CameraInfoSyncPolicy(10), depth_info_sub_,
-                                 rgb_info_sub_) {
+                                 rgb_info_sub_),
+        depth_camera_(),
+        rgb_camera_(),
+        camera_tracker_(depth_camera_, rgb_camera_),
+        depth_segmenter_(depth_camera_) {
     image_sync_policy_.registerCallback(
         boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
     camera_info_sync_policy_.registerCallback(
@@ -195,10 +199,8 @@ class DepthSegmentationNode {
     rgb_camera_.initialize(rgb_image_size.x(), rgb_image_size.y(), CV_8UC1,
                            K_rgb);
 
-    depth_segmenter_.initialize(depth_camera_);
-
+    depth_segmenter_.initialize();
     camera_tracker_.initialize(
-        depth_camera_, rgb_camera_,
         camera_tracker_.kCameraTrackerNames
             [camera_tracker_.CameraTrackerType::kRgbdICPOdometry]);
 
