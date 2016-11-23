@@ -37,8 +37,9 @@ class DepthSegmentationNode {
                                  rgb_info_sub_),
         depth_camera_(),
         rgb_camera_(),
+        surface_normal_params_(),
         camera_tracker_(depth_camera_, rgb_camera_),
-        depth_segmenter_(depth_camera_) {
+        depth_segmenter_(depth_camera_, surface_normal_params_) {
     image_sync_policy_.registerCallback(
         boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
     camera_info_sync_policy_.registerCallback(
@@ -63,6 +64,7 @@ class DepthSegmentationNode {
 
   depth_segmentation::CameraTracker camera_tracker_;
   depth_segmentation::DepthSegmenter depth_segmenter_;
+  depth_segmentation::SurfaceNormalParams surface_normal_params_;
 
   message_filters::Subscriber<sensor_msgs::CameraInfo> depth_info_sub_;
   message_filters::Subscriber<sensor_msgs::CameraInfo> rgb_info_sub_;
@@ -149,8 +151,16 @@ class DepthSegmentationNode {
           cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
                             CV_32FC3);
           depth_segmenter_.computeDepthMap(rescaled_depth, &depth_map);
-          cv::Mat normal_map;
-          depth_segmenter_.computeNormalMap(depth_map, &normal_map);
+          cv::Mat normal_map(depth_map.size(), CV_32FC3);
+          if (surface_normal_params_.method ==
+                  cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS ||
+              surface_normal_params_.method ==
+                  cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI) {
+            depth_segmenter_.computeNormalMap(depth_map, &normal_map);
+          } else if (surface_normal_params_.method ==
+                     cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD) {
+            depth_segmenter_.computeNormalMap(rescaled_depth, &normal_map);
+          }
 
           // Update the member images to the new images.
           // TODO(ff): Consider only doing this, when we are far enough away
