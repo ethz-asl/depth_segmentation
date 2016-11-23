@@ -64,6 +64,8 @@ void CameraTracker::visualize(const cv::Mat old_depth_image,
   CHECK(!old_depth_image.empty());
   CHECK(!new_depth_image.empty());
   CHECK_EQ(old_depth_image.size(), new_depth_image.size());
+  CHECK(old_depth_image.type() == CV_32FC1);
+  CHECK(new_depth_image.type() == CV_32FC1);
 
   // Place both depth images into one.
   cv::Size size_old_depth = old_depth_image.size();
@@ -81,14 +83,15 @@ void CameraTracker::visualize(const cv::Mat old_depth_image,
   // Adjust the colors, such that the depth images look nicer.
   double min;
   double max;
-  cv::minMaxIdx(combined_depth, &min, &max);
+  cv::minMaxIdx(combined_depth, &min, &max, 0, 0,
+                cv::Mat(combined_depth == combined_depth));
   combined_depth -= min;
   cv::Mat adjusted_depth;
   cv::convertScaleAbs(combined_depth, adjusted_depth,
-                      (double)kImageRange / double(max - min));
+                      static_cast<double>(kImageRange) / (max - min));
 
   cv::imshow(kDebugWindowName, adjusted_depth);
-  cv::waitKey(0);
+  cv::waitKey(1);
 }
 
 void CameraTracker::createMask(const cv::Mat& depth, cv::Mat* mask) {
@@ -148,10 +151,11 @@ void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
 
 void DepthSegmenter::initialize() {
   CHECK(depth_camera_.initialized());
-  LOG(INFO) << depth_camera_.getCameraMatrix();
-  rgbd_normals_ =
-      cv::rgbd::RgbdNormals(depth_camera_.getWidth(), depth_camera_.getHeight(),
-                            CV_32FC1, depth_camera_.getCameraMatrix());
+  rgbd_normals_ = cv::rgbd::RgbdNormals(
+      depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
+      depth_camera_.getCameraMatrix(), surface_normal_params_.window_size,
+      surface_normal_params_.method);
+  LOG(INFO) << "DepthSegmenter initialized";
 }
 
 void DepthSegmenter::computeDepthMap(const cv::Mat& depth_image,
@@ -159,14 +163,30 @@ void DepthSegmenter::computeDepthMap(const cv::Mat& depth_image,
   CHECK(!depth_image.empty());
   CHECK(depth_image.type() == CV_32FC1);
   CHECK_NOTNULL(depth_map);
+  CHECK_EQ(depth_image.size(), depth_map->size());
+  CHECK(depth_map->type() == CV_32FC3);
+
   cv::rgbd::depthTo3d(depth_image, depth_camera_.getCameraMatrix(), *depth_map);
 }
 
 void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
                                       cv::Mat* normal_map) {
   CHECK(!depth_map.empty());
-  CHECK(depth_map.type() == CV_32FC1);
+  size_t normal_method = surface_normal_params_.method;
+  CHECK(depth_map.type() == CV_32FC3 &&
+            (normal_method == cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS ||
+             normal_method == cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI) ||
+        (depth_map.type() == CV_32FC1) &&
+            normal_method ==
+                cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD);
   CHECK_NOTNULL(normal_map);
+
   rgbd_normals_(depth_map, *normal_map);
+#ifdef DISPLAY_NORMAL_IMAGES
+  // Taking the negative values of the normal map, as all normals point in
+  // negative z-direction.
+  imshow(kDebugWindowName, -*normal_map);
+  cv::waitKey(1);
+#endif  // DISPLAY_NORMAL_IMAGES
 }
 }
