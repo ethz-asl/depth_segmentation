@@ -64,8 +64,8 @@ void CameraTracker::visualize(const cv::Mat old_depth_image,
   CHECK(!old_depth_image.empty());
   CHECK(!new_depth_image.empty());
   CHECK_EQ(old_depth_image.size(), new_depth_image.size());
-  CHECK(old_depth_image.type() == CV_32FC1);
-  CHECK(new_depth_image.type() == CV_32FC1);
+  CHECK_EQ(old_depth_image.type(), CV_32FC1);
+  CHECK_EQ(new_depth_image.type(), CV_32FC1);
 
   // Place both depth images into one.
   cv::Size size_old_depth = old_depth_image.size();
@@ -96,9 +96,9 @@ void CameraTracker::visualize(const cv::Mat old_depth_image,
 
 void CameraTracker::createMask(const cv::Mat& depth, cv::Mat* mask) {
   CHECK(!depth.empty());
-  CHECK(depth.type() == CV_32FC1);
+  CHECK_EQ(depth.type(), CV_32FC1);
+  CHECK_NOTNULL(mask);
   CHECK(depth.size() == mask->size());
-  CHECK(mask);
   for (size_t y = 0u; y < depth.rows; ++y) {
     for (size_t x = 0u; x < depth.cols; ++x) {
       if (cvIsNaN(depth.at<float>(y, x)) || depth.at<float>(y, x) > kMaxDepth ||
@@ -110,10 +110,10 @@ void CameraTracker::createMask(const cv::Mat& depth, cv::Mat* mask) {
 
 void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
   CHECK(!image.empty());
-  CHECK(image.type() == CV_8UC1);
+  CHECK_EQ(image.type(), CV_8UC1);
   CHECK(!depth.empty());
-  CHECK(depth.type() == CV_32FC1);
-  CHECK(depth.size() == image.size());
+  CHECK_EQ(depth.type(), CV_32FC1);
+  CHECK_EQ(depth.size(), image.size());
 
   cv::Mat mask(image.size(), CV_8UC1, cv::Scalar(kImageRange));
   createMask(depth, &mask);
@@ -151,6 +151,7 @@ void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
 
 void DepthSegmenter::initialize() {
   CHECK(depth_camera_.initialized());
+  CHECK_EQ(surface_normal_params_.window_size % 2, 1);
   rgbd_normals_ = cv::rgbd::RgbdNormals(
       depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
       depth_camera_.getCameraMatrix(), surface_normal_params_.window_size,
@@ -161,10 +162,10 @@ void DepthSegmenter::initialize() {
 void DepthSegmenter::computeDepthMap(const cv::Mat& depth_image,
                                      cv::Mat* depth_map) {
   CHECK(!depth_image.empty());
-  CHECK(depth_image.type() == CV_32FC1);
+  CHECK_EQ(depth_image.type(), CV_32FC1);
   CHECK_NOTNULL(depth_map);
   CHECK_EQ(depth_image.size(), depth_map->size());
-  CHECK(depth_map->type() == CV_32FC3);
+  CHECK_EQ(depth_map->type(), CV_32FC3);
 
   cv::rgbd::depthTo3d(depth_image, depth_camera_.getCameraMatrix(), *depth_map);
 }
