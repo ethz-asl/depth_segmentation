@@ -137,7 +137,9 @@ class DepthSegmenter {
   void computeDepthMap(const cv::Mat& depth_image, cv::Mat* depth_map);
   void computeMaxDistanceMap(const cv::Mat& image, cv::Mat* distance_map);
   void computeNormalMap(const cv::Mat& depth_map, cv::Mat* normal_map);
-  void computeMinConcavityMap(const cv::Mat& image, cv::Mat* concavity_map);
+  void computeMinConcavityMap(const cv::Mat& depth_map,
+                              const cv::Mat& normal_map,
+                              cv::Mat* min_concavity_map);
   void convertToConcavityAwareNormalMap(const cv::Mat& concavity_map,
                                         const cv::Mat& normal_map,
                                         cv::Mat* combined_map);

@@ -189,4 +189,8 @@ void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
   cv::waitKey(1);
 #endif  // DISPLAY_NORMAL_IMAGES
 }
+
+void DepthSegmenter::computeMinConcavityMap(const cv::Mat& depth_map,
+                                            const cv::Mat& normal_map,
+                                            cv::Mat* min_concavity_map) {}
 }
