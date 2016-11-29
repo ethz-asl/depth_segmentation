@@ -288,6 +288,14 @@ void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
 
 void DepthSegmenter::computeMinConcavityMap(const cv::Mat& depth_map,
                                             const cv::Mat& normal_map,
-                                            cv::Mat* min_concavity_map) {}
+                                            cv::Mat* min_concavity_map) {
+  CHECK(!depth_map.empty());
+  CHECK(!normal_map.empty());
+  CHECK(depth_map.type() == CV_32FC3);
+  CHECK_NOTNULL(min_concavity_map);
+  CHECK_EQ(min_concavity_map->type(), CV_32FC1);
+  // Check if window_size is odd.
+  CHECK_EQ(min_concavity_map_params_.window_size % 2, 1);
+}
 
 }  // namespace depth_segmentation

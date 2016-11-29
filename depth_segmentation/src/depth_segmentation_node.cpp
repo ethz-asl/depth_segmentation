@@ -37,9 +37,10 @@ class DepthSegmentationNode {
         rgb_camera_(),
         surface_normal_params_(),
         max_distance_map_params_(),
+        min_concavity_map_params_(),
         camera_tracker_(depth_camera_, rgb_camera_),
         depth_segmenter_(depth_camera_, surface_normal_params_,
-                         max_distance_map_params_) {
+                         max_distance_map_params_, min_concavity_map_params_) {
     image_sync_policy_.registerCallback(
         boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
     camera_info_sync_policy_.registerCallback(
@@ -64,6 +65,8 @@ class DepthSegmentationNode {
 
   depth_segmentation::SurfaceNormalParams surface_normal_params_;
   depth_segmentation::MaxDistanceMapParams max_distance_map_params_;
+  depth_segmentation::MinConcavityMapParams min_concavity_map_params_;
+
   depth_segmentation::CameraTracker camera_tracker_;
   depth_segmentation::DepthSegmenter depth_segmenter_;
 

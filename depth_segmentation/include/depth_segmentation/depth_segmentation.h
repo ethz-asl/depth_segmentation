@@ -131,10 +131,12 @@ class DepthSegmenter {
  public:
   DepthSegmenter(const DepthCamera& depth_camera,
                  const SurfaceNormalParams& surface_normal_params,
-                 const MaxDistanceMapParams& max_distance_map_params)
+                 const MaxDistanceMapParams& max_distance_map_params,
+                 const MinConcavityMapParams& min_concavity_map_params)
       : depth_camera_(depth_camera),
         surface_normal_params_(surface_normal_params),
-        max_distance_map_params_(max_distance_map_params) {
+        max_distance_map_params_(max_distance_map_params),
+        min_concavity_map_params_(min_concavity_map_params) {
     CHECK_EQ(surface_normal_params.window_size % 2, 1);
     CHECK_EQ(max_distance_map_params_.window_size % 2, 1);
   };
@@ -157,6 +159,7 @@ class DepthSegmenter {
 
   const SurfaceNormalParams& surface_normal_params_;
   const MaxDistanceMapParams& max_distance_map_params_;
+  const MinConcavityMapParams& min_concavity_map_params_;
 
   cv::rgbd::RgbdNormals rgbd_normals_;
 };

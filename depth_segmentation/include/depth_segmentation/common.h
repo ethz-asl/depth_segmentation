@@ -31,6 +31,11 @@ struct MaxDistanceMapParams {
   double sensor_min_distance = 0.2;
 };
 
+struct MinConcavityMapParams {
+  MinConcavityMapParams() { CHECK_EQ(window_size % 2, 1); }
+  size_t window_size = 3;
+};
+
 struct IsNan {
   template <class T>
   bool operator()(T const& p) const {
