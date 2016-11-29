@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber.h>
@@ -64,10 +62,10 @@ class DepthSegmentationNode {
   depth_segmentation::DepthCamera depth_camera_;
   depth_segmentation::RgbCamera rgb_camera_;
 
-  depth_segmentation::CameraTracker camera_tracker_;
-  depth_segmentation::DepthSegmenter depth_segmenter_;
   depth_segmentation::SurfaceNormalParams surface_normal_params_;
   depth_segmentation::MaxDistanceMapParams max_distance_map_params_;
+  depth_segmentation::CameraTracker camera_tracker_;
+  depth_segmentation::DepthSegmenter depth_segmenter_;
 
   message_filters::Subscriber<sensor_msgs::CameraInfo> depth_info_sub_;
   message_filters::Subscriber<sensor_msgs::CameraInfo> rgb_info_sub_;
@@ -234,6 +232,7 @@ class DepthSegmentationNode {
 };
 
 int main(int argc, char** argv) {
+  google::InitGoogleLogging(argv[0]);
   ros::init(argc, argv, "depth_segmentation_node");
   DepthSegmentationNode depth_segmentation_node;
 

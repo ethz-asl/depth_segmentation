@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <glog/logging.h>
 #include <opencv2/rgbd.hpp>
 
 namespace depth_segmentation {
@@ -10,16 +11,20 @@ namespace depth_segmentation {
 const static std::string kDebugWindowName = "DebugImages";
 
 struct SurfaceNormalParams {
+  SurfaceNormalParams() { CHECK_EQ(window_size % 2, 1); }
   size_t window_size = 7;
   size_t method = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS;
 };
 
 struct MaxDistanceMapParams {
+  MaxDistanceMapParams() { CHECK_EQ(window_size % 2, 1); }
   size_t window_size = 3;
-  bool use_mask = false;
+  bool ignore_nan_coordinates = false;  // TODO(ff): This probably doesn't make
+                                        // a lot of sense -> consider removing
+                                        // it.
   bool use_threshold = true;
-  bool exclude_nan_as_max = false;
-  double noise_thresholding_factor = 50.0;
+  bool exclude_nan_as_max_distance = false;
+  double noise_thresholding_factor = 10.0;
   double sensor_noise_param_1 = 0.0012;  // From Nguyen et al. (2012)
   double sensor_noise_param_2 = 0.0019;  // From Nguyen et al. (2012)
   double sensor_noise_param_3 = 0.0001;  // From Nguyen et al. (2012)

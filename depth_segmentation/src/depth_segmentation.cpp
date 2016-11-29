@@ -181,21 +181,19 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
   // Check if window_size is odd.
   CHECK_EQ(max_distance_map_params_.window_size % 2, 1);
 
+  max_distance_map->setTo(cv::Scalar(0.0f));
+
   const size_t kernel_size = max_distance_map_params_.window_size;
-  const size_t n_kernels = kernel_size * kernel_size - 1;
-  std::vector<cv::Mat> kernels(n_kernels);  // TODO(ff): probably remove.
-  std::vector<cv::Mat> distance_images(n_kernels);
-  size_t idx = 0;
+  const size_t n_kernels = kernel_size * kernel_size - 1u;
 
   // Define the n kernels and compute the filtered images.
   for (size_t i = 0u; i < n_kernels + 1u; ++i) {
-    if (i == n_kernels / 2) {
+    if (i == n_kernels / 2u) {
       continue;
     }
     cv::Mat kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32FC1);
     kernel.at<float>(i) = -1;
     kernel.at<float>(n_kernels / 2u) = 1;
-    kernels.push_back(kernel);
 
     // Compute the filtered images.
     cv::Mat filtered_image(depth_map.size(), CV_32FC3);
@@ -204,7 +202,8 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
     // Calculate the norm over the three channels.
     std::vector<cv::Mat> channels(3);
     cv::split(filtered_image, channels);
-    if (max_distance_map_params_.use_mask) {
+    cv::Mat distance_map(depth_map.size(), CV_32FC1);
+    if (max_distance_map_params_.ignore_nan_coordinates) {
       // Ignore nan values for the distance calculation.
       cv::Mat mask_0 = cv::Mat(channels[0] == channels[0]);
       cv::Mat mask_1 = cv::Mat(channels[1] == channels[1]);
@@ -212,51 +211,37 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
       mask_0.convertTo(mask_0, CV_32FC1);
       mask_1.convertTo(mask_1, CV_32FC1);
       mask_2.convertTo(mask_2, CV_32FC1);
-      distance_images.at(idx) = mask_0.mul(channels[0].mul(channels[0])) +
-                                mask_1.mul(channels[1].mul(channels[1])) +
-                                mask_2.mul(channels[2].mul(channels[2]));
+      distance_map = mask_0.mul(channels[0].mul(channels[0])) +
+                     mask_1.mul(channels[1].mul(channels[1])) +
+                     mask_2.mul(channels[2].mul(channels[2]));
     } else {
       // If at least one of the coordinates is nan the distance will be nan.
-      distance_images.at(idx) = channels[0].mul(channels[0]) +
-                                channels[1].mul(channels[1]) +
-                                channels[2].mul(channels[2]);
+      distance_map = channels[0].mul(channels[0]) +
+                     channels[1].mul(channels[1]) +
+                     channels[2].mul(channels[2]);
     }
-    cv::sqrt(distance_images.at(idx), distance_images.at(idx));
-    ++idx;
+
+    if (max_distance_map_params_.exclude_nan_as_max_distance) {
+      cv::Mat mask = cv::Mat(distance_map == distance_map);
+      mask.convertTo(mask, CV_32FC1);
+      distance_map = mask.mul(distance_map);
+    }
+    // Individually set the maximum pixel value of the two matrices.
+    cv::max(*max_distance_map, distance_map, *max_distance_map);
   }
+
+  cv::sqrt(*max_distance_map, *max_distance_map);
   std::vector<cv::Mat> channels(3);
   cv::split(depth_map, channels);
 
-  // Set the maximum pixel value of all n filtered images.
-  for (size_t i = 0u; i < depth_map.cols * depth_map.rows; ++i) {
-    std::vector<float> pixel_values(n_kernels);
-    for (size_t j = 0u; j < n_kernels; ++j) {
-      pixel_values.at(j) = distance_images.at(j).at<float>(i);
-    }
-    float max;
-    if (max_distance_map_params_.exclude_nan_as_max) {
-      std::sort(pixel_values.begin(), pixel_values.end(),
-                std::greater<float>());
-
-      std::vector<float>::iterator it =
-          std::find_if(pixel_values.begin(), pixel_values.end(),
-                       depth_segmentation::IsNotNan());
-      if (it != pixel_values.end()) {
-        max = *it;
-      } else {
-        max = 0;
-      }
-
-    } else {
-      max = *std::max_element(pixel_values.begin(), pixel_values.end());
-    }
-
-    if (max_distance_map_params_.use_threshold) {
+  // Threshold the max_distance_map to get an edge map.
+  if (max_distance_map_params_.use_threshold) {
+    for (size_t i = 0u; i < depth_map.cols * depth_map.rows; ++i) {
       // Threshold the distance map based on Nguyen et al. (2012) noise model.
       // TODO(ff): Theta should be the angle between the normal and the camera
       // direction. (Here, a mean value is used, as suggested by Tateno et al.
       // (2016))
-      static constexpr float theta = 30 * CV_PI / 180;
+      static constexpr float theta = 30.f * CV_PI / 180.f;
       float z = (channels[2]).at<float>(i);
       float sigma_axial_noise =
           max_distance_map_params_.sensor_noise_param_1 +
@@ -264,15 +249,14 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
               (z - max_distance_map_params_.sensor_min_distance) *
               (z - max_distance_map_params_.sensor_min_distance) +
           max_distance_map_params_.sensor_noise_param_3 / cv::sqrt(z) * theta *
-              theta / (CV_PI / 2.0 - theta) * (CV_PI / 2.0 - theta);
-      if (max > sigma_axial_noise *
-                    max_distance_map_params_.noise_thresholding_factor) {
+              theta / (CV_PI / 2.0f - theta) * (CV_PI / 2.0f - theta);
+      if (max_distance_map->at<float>(i) >
+          sigma_axial_noise *
+              max_distance_map_params_.noise_thresholding_factor) {
         max_distance_map->at<float>(i) = 1.0f;
       } else {
         max_distance_map->at<float>(i) = 0.0f;
       }
-    } else {
-      max_distance_map->at<float>(i) = max;
     }
   }
 #ifdef DISPLAY_DISTANCE_MAP_IMAGES

@@ -134,7 +134,10 @@ class DepthSegmenter {
                  const MaxDistanceMapParams& max_distance_map_params)
       : depth_camera_(depth_camera),
         surface_normal_params_(surface_normal_params),
-        max_distance_map_params_(max_distance_map_params){};
+        max_distance_map_params_(max_distance_map_params) {
+    CHECK_EQ(surface_normal_params.window_size % 2, 1);
+    CHECK_EQ(max_distance_map_params_.window_size % 2, 1);
+  };
   void initialize();
   void computeDepthMap(const cv::Mat& depth_image, cv::Mat* depth_map);
   void computeMaxDistanceMap(const cv::Mat& image, cv::Mat* max_distance_map);
