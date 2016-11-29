@@ -130,12 +130,17 @@ class CameraTracker {
 class DepthSegmenter {
  public:
   DepthSegmenter(const DepthCamera& depth_camera,
-                 const SurfaceNormalParams& surface_normal_params)
+                 const SurfaceNormalParams& surface_normal_params,
+                 const MaxDistanceMapParams& max_distance_map_params)
       : depth_camera_(depth_camera),
-        surface_normal_params_(surface_normal_params){};
+        surface_normal_params_(surface_normal_params),
+        max_distance_map_params_(max_distance_map_params) {
+    CHECK_EQ(surface_normal_params.window_size % 2, 1);
+    CHECK_EQ(max_distance_map_params_.window_size % 2, 1);
+  };
   void initialize();
   void computeDepthMap(const cv::Mat& depth_image, cv::Mat* depth_map);
-  void computeMaxDistanceMap(const cv::Mat& image, cv::Mat* distance_map);
+  void computeMaxDistanceMap(const cv::Mat& image, cv::Mat* max_distance_map);
   void computeNormalMap(const cv::Mat& depth_map, cv::Mat* normal_map);
   void computeMinConcavityMap(const cv::Mat& depth_map,
                               const cv::Mat& normal_map,
@@ -151,6 +156,7 @@ class DepthSegmenter {
   const DepthCamera& depth_camera_;
 
   const SurfaceNormalParams& surface_normal_params_;
+  const MaxDistanceMapParams& max_distance_map_params_;
 
   cv::rgbd::RgbdNormals rgbd_normals_;
 };
