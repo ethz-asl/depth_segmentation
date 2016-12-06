@@ -26,6 +26,7 @@ class DepthSegmentationTest : public ::testing::Test {
     camera_matrix.at<float>(1, 2) = 235.5f;
     camera_matrix.at<float>(2, 2) = 1.0f;
     depth_camera_.setCameraMatrix(camera_matrix);
+    min_concavity_map_params_.window_size = 3;
   }
   virtual ~DepthSegmentationTest() {}
   virtual void SetUp() {}

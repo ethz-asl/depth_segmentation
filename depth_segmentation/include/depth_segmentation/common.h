@@ -41,7 +41,7 @@ struct MaxDistanceMapParams {
 
 struct MinConcavityMapParams {
   MinConcavityMapParams() { CHECK_EQ(window_size % 2, 1); }
-  size_t window_size = 3;
+  size_t window_size = 5;
   size_t step_size = 1;
   bool display = false;
   bool use_threshold = true;
