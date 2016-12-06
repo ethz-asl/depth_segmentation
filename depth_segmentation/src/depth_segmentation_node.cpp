@@ -38,9 +38,12 @@ class DepthSegmentationNode {
         surface_normal_params_(),
         max_distance_map_params_(),
         min_concavity_map_params_(),
+        final_edge_map_params_(),
+        label_map_params_(),
         camera_tracker_(depth_camera_, rgb_camera_),
         depth_segmenter_(depth_camera_, surface_normal_params_,
-                         max_distance_map_params_, min_concavity_map_params_) {
+                         max_distance_map_params_, min_concavity_map_params_,
+                         final_edge_map_params_, label_map_params_) {
     image_sync_policy_.registerCallback(
         boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
     camera_info_sync_policy_.registerCallback(
@@ -66,6 +69,8 @@ class DepthSegmentationNode {
   depth_segmentation::SurfaceNormalParams surface_normal_params_;
   depth_segmentation::MaxDistanceMapParams max_distance_map_params_;
   depth_segmentation::MinConcavityMapParams min_concavity_map_params_;
+  depth_segmentation::FinalEdgeMapParams final_edge_map_params_;
+  depth_segmentation::LabelMapParams label_map_params_;
 
   depth_segmentation::CameraTracker camera_tracker_;
   depth_segmentation::DepthSegmenter depth_segmenter_;
@@ -151,37 +156,59 @@ class DepthSegmentationNode {
         if (camera_tracker_.computeTransform(bw_image, rescaled_depth, mask)) {
           publish_tf(camera_tracker_.getWorldTransform(),
                      depth_msg->header.stamp);
-
-          cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
-                            CV_32FC3);
-          depth_segmenter_.computeDepthMap(rescaled_depth, &depth_map);
-
-          // Compute normal map.
-          cv::Mat normal_map(depth_map.size(), CV_32FC3);
-          if (surface_normal_params_.method ==
-                  cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS ||
-              surface_normal_params_.method ==
-                  cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI) {
-            depth_segmenter_.computeNormalMap(depth_map, &normal_map);
-          } else if (surface_normal_params_.method ==
-                     cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD) {
-            depth_segmenter_.computeNormalMap(rescaled_depth, &normal_map);
-          }
-
-          // Compute maximum distance map.
-          cv::Mat distance_map(depth_camera_.getWidth(),
-                               depth_camera_.getHeight(), CV_32FC1);
-          depth_segmenter_.computeMaxDistanceMap(depth_map, &distance_map);
-
-          // Update the member images to the new images.
-          // TODO(ff): Consider only doing this, when we are far enough away
-          // from a frame. (Which basically means we would set a keyframe.)
-          depth_camera_.setImage(rescaled_depth);
-          depth_camera_.setMask(mask);
-          rgb_camera_.setImage(bw_image);
         } else {
           LOG(ERROR) << "Failed to compute Transform.";
         }
+
+        // depth_segmenter_.inpaintImage(rescaled_depth, &rescaled_depth);
+
+        // cv::inpaint(output, cv::Mat::ones(edge_map_8bit.size(), CV_8UC1),
+        // output,
+        // 3.0,
+        //             cv::INPAINT_TELEA);
+        cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
+                          CV_32FC3);
+        depth_segmenter_.computeDepthMap(rescaled_depth, &depth_map);
+
+        // Compute normal map.
+        cv::Mat normal_map(depth_map.size(), CV_32FC3);
+        if (surface_normal_params_.method ==
+                cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS ||
+            surface_normal_params_.method ==
+                cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI) {
+          depth_segmenter_.computeNormalMap(depth_map, &normal_map);
+        } else if (surface_normal_params_.method ==
+                   cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD) {
+          depth_segmenter_.computeNormalMap(cv_depth_image->image, &normal_map);
+          // depth_segmenter_.computeNormalMap(rescaled_depth, &normal_map);
+        }
+
+        // Compute maximum distance map.
+        cv::Mat distance_map(depth_camera_.getWidth(),
+                             depth_camera_.getHeight(), CV_32FC1);
+        depth_segmenter_.computeMaxDistanceMap(depth_map, &distance_map);
+
+        // Compute minimum concavity map.
+        cv::Mat concavity_map(depth_camera_.getWidth(),
+                              depth_camera_.getHeight(), CV_32FC1);
+        depth_segmenter_.computeMinConcavityMap(depth_map, normal_map,
+                                                &concavity_map);
+        cv::Mat edge_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
+                         CV_32FC1);
+        depth_segmenter_.computeFinalEdgeMap(concavity_map, distance_map,
+                                             &edge_map);
+        cv::Mat label_map(edge_map.size(), CV_32FC1);
+        depth_segmenter_.labelMap(edge_map, &label_map);
+
+        // depth_segmenter_.inpaintImage(label_map, &label_map);
+
+        // Update the member images to the new images.
+        // TODO(ff): Consider only doing this, when we are far enough away
+        // from a frame. (Which basically means we would set a keyframe.)
+        depth_camera_.setImage(rescaled_depth);
+        depth_camera_.setMask(mask);
+        rgb_camera_.setImage(bw_image);
+
       } else {
         depth_camera_.setImage(rescaled_depth);
         depth_camera_.setMask(mask);

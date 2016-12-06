@@ -4,6 +4,7 @@
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/photo/photo.hpp>
 
 namespace depth_segmentation {
 
@@ -15,9 +16,6 @@ CameraTracker::CameraTracker(const DepthCamera& depth_camera,
       transform_(4, 4, CV_64FC1) {
   world_transform_ = cv::Mat::eye(4, 4, CV_64FC1);
   transform_ = cv::Mat::eye(4, 4, CV_64FC1);
-#ifdef DISPLAY_DEPTH_IMAGES
-  cv::namedWindow(kDebugWindowName, cv::WINDOW_AUTOSIZE);
-#endif  // DISPLAY_DEPTH_IMAGES
 }
 
 void CameraTracker::initialize(const std::string odometry_type) {
@@ -168,6 +166,7 @@ void DepthSegmenter::computeDepthMap(const cv::Mat& depth_image,
   CHECK_NOTNULL(depth_map);
   CHECK_EQ(depth_image.size(), depth_map->size());
   CHECK_EQ(depth_map->type(), CV_32FC3);
+  CHECK(!depth_camera_.getCameraMatrix().empty());
 
   cv::rgbd::depthTo3d(depth_image, depth_camera_.getCameraMatrix(), *depth_map);
 }
@@ -192,8 +191,8 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
       continue;
     }
     cv::Mat kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32FC1);
-    kernel.at<float>(i) = -1;
-    kernel.at<float>(n_kernels / 2u) = 1;
+    kernel.at<float>(i) = -1.0f;
+    kernel.at<float>(n_kernels / 2u) = 1.0f;
 
     // Compute the filtered images.
     cv::Mat filtered_image(depth_map.size(), CV_32FC3);
@@ -259,10 +258,12 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
       }
     }
   }
-#ifdef DISPLAY_DISTANCE_MAP_IMAGES
-  cv::imshow(kDebugWindowName, *max_distance_map);
-  cv::waitKey(1);
-#endif  // DISPLAY_DISTANCE_MAP_IMAGES
+  if (max_distance_map_params_.display) {
+    static const std::string kWindowName = "MaxDistanceMap";
+    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    cv::imshow(kWindowName, *max_distance_map);
+    cv::waitKey(1);
+  }
 }
 
 void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
@@ -272,18 +273,20 @@ void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
   CHECK(depth_map.type() == CV_32FC3 &&
             (normal_method == cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS ||
              normal_method == cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI) ||
-        (depth_map.type() == CV_32FC1) &&
+        (depth_map.type() == CV_32FC1 || depth_map.type() == CV_16UC1) &&
             normal_method ==
                 cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD);
   CHECK_NOTNULL(normal_map);
 
   rgbd_normals_(depth_map, *normal_map);
-#ifdef DISPLAY_NORMAL_IMAGES
-  // Taking the negative values of the normal map, as all normals point in
-  // negative z-direction.
-  imshow(kDebugWindowName, -*normal_map);
-  cv::waitKey(1);
-#endif  // DISPLAY_NORMAL_IMAGES
+  if (surface_normal_params_.display) {
+    static const std::string kWindowName = "NormalMap";
+    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    // Taking the negative values of the normal map, as all normals point in
+    // negative z-direction.
+    cv::imshow(kWindowName, -*normal_map);
+    cv::waitKey(1);
+  }
 }
 
 void DepthSegmenter::computeMinConcavityMap(const cv::Mat& depth_map,
@@ -291,11 +294,296 @@ void DepthSegmenter::computeMinConcavityMap(const cv::Mat& depth_map,
                                             cv::Mat* min_concavity_map) {
   CHECK(!depth_map.empty());
   CHECK(!normal_map.empty());
-  CHECK(depth_map.type() == CV_32FC3);
+  CHECK_EQ(depth_map.type(), CV_32FC3);
+  CHECK_EQ(normal_map.type(), CV_32FC3);
+  CHECK_EQ(depth_map.size(), normal_map.size());
   CHECK_NOTNULL(min_concavity_map);
   CHECK_EQ(min_concavity_map->type(), CV_32FC1);
+  CHECK_EQ(depth_map.size(), min_concavity_map->size());
   // Check if window_size is odd.
   CHECK_EQ(min_concavity_map_params_.window_size % 2, 1);
+  min_concavity_map->setTo(cv::Scalar(10.0f));
+
+  const size_t kernel_size = min_concavity_map_params_.window_size +
+                             (min_concavity_map_params_.step_size - 1u) *
+                                 (min_concavity_map_params_.window_size - 1u);
+  const size_t n_kernels = min_concavity_map_params_.window_size *
+                               min_concavity_map_params_.window_size -
+                           1u;
+  // Define the n kernels and compute the filtered images.
+  for (size_t i = 0u; i < n_kernels + 1u;
+       i += (int)(i % kernel_size == kernel_size) * kernel_size +
+            min_concavity_map_params_.step_size) {
+    if (i == n_kernels / 2u) {
+      continue;
+    }
+    cv::Mat difference_kernel =
+        cv::Mat::zeros(kernel_size, kernel_size, CV_32FC1);
+    difference_kernel.at<float>(i) = 1.0f;
+    difference_kernel.at<float>(n_kernels / 2u) = -1.0f;
+
+    // Compute the filtered images.
+    cv::Mat difference_map(depth_map.size(), CV_32FC3);
+    cv::filter2D(depth_map, difference_map, CV_32FC3, difference_kernel);
+
+    // Calculate the dot product over the three channels of difference_map and
+    // normal_map.
+    cv::Mat difference_times_normal(depth_map.size(), CV_32FC1);
+    difference_times_normal = difference_map.mul(normal_map);
+    std::vector<cv::Mat> channels(3);
+    cv::split(difference_times_normal, channels);
+    cv::Mat vector_projection(depth_map.size(), CV_32FC1);
+    vector_projection = channels[0] + channels[1] + channels[2];
+
+    cv::Mat concavity_mask(depth_map.size(), CV_32FC1);
+    cv::Mat convexity_mask(depth_map.size(), CV_32FC1);
+
+    cv::threshold(vector_projection, convexity_mask, 0.0f, 1.0f,
+                  cv::THRESH_BINARY);
+
+    cv::threshold(vector_projection, concavity_mask, 0.0f, 1.0f,
+                  cv::THRESH_BINARY_INV);
+
+    cv::Mat normal_kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32FC1);
+    normal_kernel.at<float>(i) = 1.0f;
+
+    cv::Mat filtered_normal_image = cv::Mat::zeros(normal_map.size(), CV_32FC3);
+    cv::filter2D(normal_map, filtered_normal_image, CV_32FC3, normal_kernel);
+
+    // // TODO(ff): Create a function for this mulitplication and projections.
+    cv::Mat normal_times_filtered_normal(depth_map.size(), CV_32FC3);
+    normal_times_filtered_normal = normal_map.mul(filtered_normal_image);
+    std::vector<cv::Mat> normal_channels(3);
+    cv::split(normal_times_filtered_normal, normal_channels);
+    cv::Mat normal_vector_projection(depth_map.size(), CV_32FC1);
+    normal_vector_projection =
+        normal_channels[0] + normal_channels[1] + normal_channels[2];
+    normal_vector_projection = concavity_mask.mul(normal_vector_projection);
+
+    cv::Mat concavity_map = cv::Mat::ones(depth_map.size(), CV_32FC1);
+    concavity_map = convexity_mask + normal_vector_projection;
+
+    // Individually set the maximum pixel value of the two matrices.
+    cv::min(*min_concavity_map, concavity_map, *min_concavity_map);
+  }
+
+  *min_concavity_map = cv::abs(*min_concavity_map);
+  if (min_concavity_map_params_.use_threshold) {
+    cv::threshold(*min_concavity_map, *min_concavity_map,
+                  min_concavity_map_params_.threshold, 1.0f, cv::THRESH_BINARY);
+  }
+
+  static constexpr size_t kInvDilationSize = 1u;
+  static constexpr size_t kDilationSize = 1u;
+
+  cv::Mat element = cv::getStructuringElement(
+      cv::MORPH_RECT,
+      cv::Size(2u * kInvDilationSize + 1u, 2u * kInvDilationSize + 1u),
+      cv::Point(kInvDilationSize, kInvDilationSize));
+  cv::morphologyEx(*min_concavity_map, *min_concavity_map, cv::MORPH_OPEN,
+                   element);
+
+  if (min_concavity_map_params_.display) {
+    static const std::string kWindowName = "MinConcavityMap";
+    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    cv::imshow(kWindowName, *min_concavity_map);
+    cv::waitKey(1);
+  }
+}
+
+void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& concavity_map,
+                                         const cv::Mat& distance_map,
+                                         cv::Mat* edge_map) {
+  static constexpr size_t kInvDilationSize = 1u;
+  static constexpr size_t kDilationSize = 1u;
+
+  cv::Mat element = cv::getStructuringElement(
+      cv::MORPH_RECT,
+      cv::Size(2u * kInvDilationSize + 1u, 2u * kInvDilationSize + 1u),
+      cv::Point(kInvDilationSize, kInvDilationSize));
+
+  cv::Mat concavity_map_inv;
+  cv::threshold(concavity_map, concavity_map_inv, 0.5f, 1.0f,
+                cv::THRESH_BINARY_INV);
+
+  cv::dilate(concavity_map_inv, concavity_map_inv, element);
+  // cv::morphologyEx(concavity_map_inv, concavity_map_inv, cv::MORPH_CLOSE,
+  //                  element);
+  cv::namedWindow("concavity_map", CV_WINDOW_AUTOSIZE);
+  cv::imshow("concavity_map", concavity_map);
+  cv::threshold(concavity_map_inv, concavity_map_inv, 0.5f, 1.0f,
+                cv::THRESH_BINARY_INV);
+  element = cv::getStructuringElement(
+      cv::MORPH_RECT,
+      cv::Size(2u * kDilationSize + 1u, 2u * kDilationSize + 1u),
+      cv::Point(kDilationSize, kDilationSize));
+  // cv::dilate(concavity_map, concavity_map, element);
+  cv::multiply(concavity_map_inv, concavity_map, concavity_map);
+  cv::dilate(distance_map, distance_map, element);
+  // cv::morphologyEx(distance_map, distance_map, cv::MORPH_CLOSE, element);
+
+  *edge_map = concavity_map - distance_map;
+  // cv::morphologyEx(*edge_map, *edge_map, cv::MORPH_CLOSE, element);
+  if (final_edge_map_params_.display) {
+    static const std::string kWindowName = "FinalEdgeMap";
+    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    imshow(kWindowName, *edge_map);
+    cv::waitKey(1);
+  }
+}
+
+void DepthSegmenter::findBlobs(const cv::Mat& binary,
+                               std::vector<std::vector<cv::Point2i> >* labels) {
+  labels->clear();
+
+  cv::Mat label_image;
+  binary.convertTo(label_image, CV_32SC1);
+
+  // Labels start at 2 as we use 0 for background and 1 for unlabled.
+  int label_count = 2;
+  for (size_t y = 0u; y < label_image.rows; ++y) {
+    for (size_t x = 0u; x < label_image.cols; ++x) {
+      if (label_image.at<int>(y, x) != 1) {
+        continue;
+      }
+      cv::Rect rect;
+      cv::floodFill(label_image, cv::Point(x, y), label_count, &rect, 0, 0,
+                    cv::FLOODFILL_FIXED_RANGE);
+      std::vector<cv::Point2i> blob;
+      for (size_t i = rect.y; i < (rect.y + rect.height); ++i) {
+        for (size_t j = rect.x; j < (rect.x + rect.width); ++j) {
+          if (label_image.at<int>(i, j) != label_count) {
+            continue;
+          }
+          blob.push_back(cv::Point2i(j, i));
+        }
+      }
+      if (blob.size() > 1u) {
+        labels->push_back(blob);
+        ++label_count;
+      }
+    }
+  }
+}
+
+void DepthSegmenter::inpaintImage(const cv::Mat& image, cv::Mat* inpainted) {
+  CHECK(false) << "THIS IS UNTESTED AND PROBABLY WRONG.";
+  cv::Mat border_image;
+  cv::Mat inpainted_8bit;
+  double inpaint_radius = 3;
+  int make_border = 1;
+  cv::copyMakeBorder(image, border_image, make_border, make_border, make_border,
+                     make_border, cv::BORDER_REPLICATE);
+  border_image.convertTo(border_image, CV_8UC3, 255.0f);
+  cv::inpaint(border_image, (border_image == border_image), inpainted_8bit,
+              inpaint_radius, cv::INPAINT_TELEA);
+  inpainted_8bit.convertTo(inpainted_8bit, CV_32FC3, 1.0f / 255.0f);
+  *inpainted = inpainted_8bit(
+      cv::Rect(make_border, make_border, image.cols, image.rows));
+  cv::namedWindow("inpainted", CV_WINDOW_AUTOSIZE);
+  cv::imshow("inpainted", *inpainted);
+}
+
+void DepthSegmenter::labelMap(const cv::Mat& edge_map, cv::Mat* labeled_map) {
+  cv::RNG rng(12345);
+  cv::Mat binary_edge_map;
+  // TODO(ff): Remove this.
+  // binary_edge_map = edge_map;
+  // // denoising:
+  // cv::medianBlur(edge_map, binary_edge_map, 5);
+  // // cv::GaussianBlur(edge_map, binary_edge_map, cv::Size(15, 15), 0, 0);
+  // // cv::boxFilter(edge_map, binary_edge_map, CV_8UC1, cv::Size(15, 15));
+  // // cv::bilateralFilter(binary_edge_map, binary_edge_map, 5, 1, 0);
+  // static constexpr double kDilationSize = 2;
+  // cv::Mat element = cv::getStructuringElement(
+  //     cv::MORPH_RECT, cv::Size(2 * kDilationSize + 1, 2 * kDilationSize + 1),
+  //     cv::Point(kDilationSize, kDilationSize));
+  // cv::dilate(binary_edge_map, binary_edge_map, element);
+  // cv::erode(binary_edge_map, binary_edge_map, element);
+
+  std::vector<std::vector<cv::Point2i> > labels;
+  cv::threshold(edge_map, binary_edge_map, 0.0, 1.0, cv::THRESH_BINARY);
+  findBlobs(binary_edge_map, &labels);
+  cv::Mat output = cv::Mat::zeros(binary_edge_map.size(), CV_8UC3);
+
+  // Randomly color the labels
+  for (size_t i = 0u; i < labels.size(); ++i) {
+    unsigned char r = 255 * (rand() / (1.0 + RAND_MAX));
+    unsigned char g = 255 * (rand() / (1.0 + RAND_MAX));
+    unsigned char b = 255 * (rand() / (1.0 + RAND_MAX));
+
+    for (size_t j = 0u; j < labels[i].size(); ++j) {
+      int x = labels[i][j].x;
+      int y = labels[i][j].y;
+
+      output.at<cv::Vec3b>(y, x)[0] = b;
+      output.at<cv::Vec3b>(y, x)[1] = g;
+      output.at<cv::Vec3b>(y, x)[2] = r;
+    }
+  }
+  if (label_map_params_.display) {
+    static const std::string kWindowName = "LabelMap";
+    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    imshow(kWindowName, output);
+    cv::waitKey(1);
+  }
+
+  // TODO(ff): Try using inpaint here.
+  // cv::Mat edge_map_8bit;
+  // cv::threshold(edge_map, edge_map_8bit, 0.5f, 255, cv::THRESH_BINARY_INV);
+  // edge_map_8bit.convertTo(edge_map_8bit, CV_8UC1);
+  // cv::inpaint(output, edge_map_8bit, output, 5.0, cv::INPAINT_TELEA);
+
+  // TODO(ff): Consider removing this.
+  // static constexpr double kKernelSize = 1;
+  //
+  // cv::Mat element = cv::getStructuringElement(
+  //     cv::MORPH_RECT, cv::Size(2 * kKernelSize + 1, 2 * kKernelSize + 1),
+  //     cv::Point(kKernelSize, kKernelSize));
+  // cv::morphologyEx(output, output, cv::MORPH_DILATE, element);
+
+  // TODO(ff): Remove this.
+  // cv::Mat canny_out;
+  // std::vector<std::vector<cv::Point> > contours;
+  // std::vector<cv::Vec4i> hierarchy;
+  // cv::Canny(output, canny_out, 0.5, 1.0);
+  // cv::namedWindow("Canny", CV_WINDOW_AUTOSIZE);
+  // imshow("Canny", canny_out);
+  // findContours(canny_out, contours, hierarchy, CV_RETR_TREE,
+  //              CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
+  //
+  // // /// Draw contours
+  // cv::Mat drawing = cv::Mat::zeros(edge_map.size(), CV_8UC3);
+  // // cv::Mat mask = cv::Mat(output.size(), CV_8UC1, cv::Scalar(255));
+  // cv::Mat mask = cv::Mat::zeros(output.size(), CV_8UC1);
+  // for (int i = 0; i < contours.size(); ++i) {
+  //   if (contours[i].size() < 5) {
+  //     // LOG(ERROR) << contours[i];
+  //     for (int j = 0; j < contours[i].size(); ++j)
+  //       mask.at<float>(contours[i][j].y, contours[i][j].x) = 1;
+  //   }
+  //   cv::Scalar color = cv::Scalar(rng.uniform(0, 255), rng.uniform(0, 255),
+  //                                 rng.uniform(0, 255));
+  //   drawContours(drawing, contours, i, color, 2, 8, hierarchy, 0,
+  //   cv::Point());
+  // }
+  // cv::inpaint(output, mask, output, 3.0, cv::INPAINT_TELEA);
+  // cv::bilateralFilter(output, output);
+  // cv::bilateralFilter(output, output, 9, 75, 75);
+  // cv::namedWindow("Contours", CV_WINDOW_AUTOSIZE);
+  // imshow("Contours", contours);
+
+  if (label_map_params_.display) {
+    static const std::string kWindowName = "LabelMapFiltered";
+    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    imshow(kWindowName, output);
+    cv::waitKey(1);
+  }
+  // cv::namedWindow("mask", CV_WINDOW_AUTOSIZE);
+  // imshow("mask", mask);
+
+  cv::waitKey(1);
+  *labeled_map = output;
 }
 
 }  // namespace depth_segmentation
