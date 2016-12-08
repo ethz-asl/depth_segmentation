@@ -312,7 +312,13 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
   const size_t n_kernels = min_convexity_map_params_.window_size *
                                min_convexity_map_params_.window_size -
                            1u;
-  // Define the n kernels and compute the filtered images.
+  // Define the n point-wise distance kernels and compute the filtered images.
+  // The kernels for i look as follows (e.g. window_size = 5, i = 6):
+  //     0  0  0  0  0
+  //     0  1  0  0  0
+  //     0  0 -1  0  0
+  //     0  0  0  0  0
+  //     0  0  0  0  0
   for (size_t i = 0u; i < n_kernels + 1u;
        i += static_cast<size_t>(i % kernel_size == kernel_size) * kernel_size +
             min_convexity_map_params_.step_size) {
