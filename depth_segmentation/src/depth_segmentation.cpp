@@ -398,6 +398,12 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
 void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
                                          const cv::Mat& distance_map,
                                          cv::Mat* edge_map) {
+  CHECK(!convexity_map.empty());
+  CHECK(!distance_map.empty());
+  CHECK_EQ(convexity_map.type(), CV_32FC1);
+  CHECK_EQ(distance_map.type(), CV_32FC1);
+  CHECK_EQ(convexity_map.size(), distance_map.size());
+  CHECK_NOTNULL(edge_map);
   if (final_edge_map_params_.use_morphological_opening) {
     cv::Mat element = cv::getStructuringElement(
         cv::MORPH_RECT,
@@ -429,7 +435,9 @@ void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
 
 void DepthSegmenter::findBlobs(const cv::Mat& binary,
                                std::vector<std::vector<cv::Point2i>>* labels) {
-  labels->clear();
+  CHECK(!binary.empty());
+  CHECK_EQ(binary.type(), CV_32FC1);
+  CHECK_NOTNULL(labels)->clear();
   cv::Mat label_image;
   binary.convertTo(label_image, CV_32SC1);
 
@@ -444,8 +452,10 @@ void DepthSegmenter::findBlobs(const cv::Mat& binary,
       cv::floodFill(label_image, cv::Point(x, y), label_count, &rect, 0, 0,
                     cv::FLOODFILL_FIXED_RANGE);
       std::vector<cv::Point2i> blob;
-      for (size_t i = rect.y; i < (rect.y + rect.height); ++i) {
-        for (size_t j = rect.x; j < (rect.x + rect.width); ++j) {
+      size_t rect_size_y = rect.y + rect.height;
+      size_t rect_size_x = rect.x + rect.width;
+      for (size_t i = rect.y; i < rect_size_y; ++i) {
+        for (size_t j = rect.x; j < rect_size_x; ++j) {
           if (label_image.at<int>(i, j) != label_count) {
             continue;
           }
@@ -462,9 +472,11 @@ void DepthSegmenter::findBlobs(const cv::Mat& binary,
 
 void DepthSegmenter::inpaintImage(const cv::Mat& image, cv::Mat* inpainted) {
   CHECK(false) << "THIS IS UNTESTED AND PROBABLY SOMEWHAT WRONG.";
+  CHECK(!image.empty());
+  CHECK_NOTNULL(inpainted);
   cv::Mat border_image;
   cv::Mat inpainted_8bit;
-  double inpaint_radius = 3;
+  double inpaint_radius = 3.0;
   int make_border = 1;
   cv::copyMakeBorder(image, border_image, make_border, make_border, make_border,
                      make_border, cv::BORDER_REPLICATE);
