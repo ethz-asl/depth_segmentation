@@ -269,13 +269,15 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
 void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
                                       cv::Mat* normal_map) {
   CHECK(!depth_map.empty());
-  size_t normal_method = surface_normal_params_.method;
   CHECK(depth_map.type() == CV_32FC3 &&
-            (normal_method == cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS ||
-             normal_method == cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI) ||
-        (depth_map.type() == CV_32FC1 || depth_map.type() == CV_16UC1) &&
-            normal_method ==
-                cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD);
+            (surface_normal_params_.method ==
+                 SurfaceNormalEstimationMethod::kFals ||
+             surface_normal_params_.method ==
+                 SurfaceNormalEstimationMethod::kSri) ||
+        (depth_map.type() == CV_32FC1 || depth_map.type() == CV_16UC1 ||
+         depth_map.type() == CV_32FC3) &&
+            surface_normal_params_.method ==
+                SurfaceNormalEstimationMethod::kLinemod);
   CHECK_NOTNULL(normal_map);
 
   rgbd_normals_(depth_map, *normal_map);
@@ -289,31 +291,31 @@ void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
   }
 }
 
-void DepthSegmenter::computeMinConcavityMap(const cv::Mat& depth_map,
+void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
                                             const cv::Mat& normal_map,
-                                            cv::Mat* min_concavity_map) {
+                                            cv::Mat* min_convexity_map) {
   CHECK(!depth_map.empty());
   CHECK(!normal_map.empty());
   CHECK_EQ(depth_map.type(), CV_32FC3);
   CHECK_EQ(normal_map.type(), CV_32FC3);
   CHECK_EQ(depth_map.size(), normal_map.size());
-  CHECK_NOTNULL(min_concavity_map);
-  CHECK_EQ(min_concavity_map->type(), CV_32FC1);
-  CHECK_EQ(depth_map.size(), min_concavity_map->size());
+  CHECK_NOTNULL(min_convexity_map);
+  CHECK_EQ(min_convexity_map->type(), CV_32FC1);
+  CHECK_EQ(depth_map.size(), min_convexity_map->size());
   // Check if window_size is odd.
-  CHECK_EQ(min_concavity_map_params_.window_size % 2, 1);
-  min_concavity_map->setTo(cv::Scalar(10.0f));
+  CHECK_EQ(min_convexity_map_params_.window_size % 2, 1);
+  min_convexity_map->setTo(cv::Scalar(10.0f));
 
-  const size_t kernel_size = min_concavity_map_params_.window_size +
-                             (min_concavity_map_params_.step_size - 1u) *
-                                 (min_concavity_map_params_.window_size - 1u);
-  const size_t n_kernels = min_concavity_map_params_.window_size *
-                               min_concavity_map_params_.window_size -
+  const size_t kernel_size = min_convexity_map_params_.window_size +
+                             (min_convexity_map_params_.step_size - 1u) *
+                                 (min_convexity_map_params_.window_size - 1u);
+  const size_t n_kernels = min_convexity_map_params_.window_size *
+                               min_convexity_map_params_.window_size -
                            1u;
   // Define the n kernels and compute the filtered images.
   for (size_t i = 0u; i < n_kernels + 1u;
-       i += (int)(i % kernel_size == kernel_size) * kernel_size +
-            min_concavity_map_params_.step_size) {
+       i += static_cast<size_t>(i % kernel_size == kernel_size) * kernel_size +
+            min_convexity_map_params_.step_size) {
     if (i == n_kernels / 2u) {
       continue;
     }
@@ -328,8 +330,8 @@ void DepthSegmenter::computeMinConcavityMap(const cv::Mat& depth_map,
 
     // Calculate the dot product over the three channels of difference_map and
     // normal_map.
-    cv::Mat difference_times_normal(depth_map.size(), CV_32FC1);
-    difference_times_normal = difference_map.mul(normal_map);
+    cv::Mat difference_times_normal(depth_map.size(), CV_32FC3);
+    difference_times_normal = difference_map.mul(-normal_map);
     std::vector<cv::Mat> channels(3);
     cv::split(difference_times_normal, channels);
     cv::Mat vector_projection(depth_map.size(), CV_32FC1);
@@ -350,7 +352,7 @@ void DepthSegmenter::computeMinConcavityMap(const cv::Mat& depth_map,
     cv::Mat filtered_normal_image = cv::Mat::zeros(normal_map.size(), CV_32FC3);
     cv::filter2D(normal_map, filtered_normal_image, CV_32FC3, normal_kernel);
 
-    // // TODO(ff): Create a function for this mulitplication and projections.
+    // TODO(ff): Create a function for this mulitplication and projections.
     cv::Mat normal_times_filtered_normal(depth_map.size(), CV_32FC3);
     normal_times_filtered_normal = normal_map.mul(filtered_normal_image);
     std::vector<cv::Mat> normal_channels(3);
@@ -360,56 +362,63 @@ void DepthSegmenter::computeMinConcavityMap(const cv::Mat& depth_map,
         normal_channels[0] + normal_channels[1] + normal_channels[2];
     normal_vector_projection = concavity_mask.mul(normal_vector_projection);
 
-    cv::Mat concavity_map = cv::Mat::ones(depth_map.size(), CV_32FC1);
-    concavity_map = convexity_mask + normal_vector_projection;
+    cv::Mat convexity_map = cv::Mat::ones(depth_map.size(), CV_32FC1);
+    convexity_map = convexity_mask + normal_vector_projection;
 
-    // Individually set the maximum pixel value of the two matrices.
-    cv::min(*min_concavity_map, concavity_map, *min_concavity_map);
+    // Individually set the minimum pixel value of the two matrices.
+    cv::min(*min_convexity_map, convexity_map, *min_convexity_map);
   }
 
-  if (min_concavity_map_params_.use_threshold) {
-    cv::threshold(*min_concavity_map, *min_concavity_map,
-                  min_concavity_map_params_.threshold, 1.0f, cv::THRESH_BINARY);
+  if (min_convexity_map_params_.use_threshold) {
+    cv::threshold(*min_convexity_map, *min_convexity_map,
+                  min_convexity_map_params_.min_convexity_threshold, 1.0f,
+                  cv::THRESH_BINARY);
   }
 
-  static constexpr size_t kInvDilationSize = 1u;
-  static constexpr size_t kDilationSize = 1u;
+  if (min_convexity_map_params_.use_morphological_opening) {
+    cv::Mat element = cv::getStructuringElement(
+        cv::MORPH_RECT,
+        cv::Size(
+            2u * min_convexity_map_params_.morphological_opening_size + 1u,
+            2u * min_convexity_map_params_.morphological_opening_size + 1u),
+        cv::Point(min_convexity_map_params_.morphological_opening_size,
+                  min_convexity_map_params_.morphological_opening_size));
+    cv::morphologyEx(*min_convexity_map, *min_convexity_map, cv::MORPH_OPEN,
+                     element);
+  }
 
-  cv::Mat element = cv::getStructuringElement(
-      cv::MORPH_RECT,
-      cv::Size(2u * kInvDilationSize + 1u, 2u * kInvDilationSize + 1u),
-      cv::Point(kInvDilationSize, kInvDilationSize));
-  cv::morphologyEx(*min_concavity_map, *min_concavity_map, cv::MORPH_OPEN,
-                   element);
-
-  if (min_concavity_map_params_.display) {
+  if (min_convexity_map_params_.display) {
     static const std::string kWindowName = "MinConcavityMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
-    cv::imshow(kWindowName, *min_concavity_map);
+    cv::imshow(kWindowName, *min_convexity_map);
     cv::waitKey(1);
   }
 }
 
-void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& concavity_map,
+void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
                                          const cv::Mat& distance_map,
                                          cv::Mat* edge_map) {
-  static constexpr size_t kInvDilationSize = 1u;
-  static constexpr size_t kDilationSize = 1u;
+  if (final_edge_map_params_.use_morphological_opening) {
+    cv::Mat element = cv::getStructuringElement(
+        cv::MORPH_RECT,
+        cv::Size(2u * final_edge_map_params_.morphological_opening_size + 1u,
+                 2u * final_edge_map_params_.morphological_opening_size + 1u),
+        cv::Point(final_edge_map_params_.morphological_opening_size,
+                  final_edge_map_params_.morphological_opening_size));
 
-  cv::Mat element = cv::getStructuringElement(
-      cv::MORPH_RECT,
-      cv::Size(2u * kInvDilationSize + 1u, 2u * kInvDilationSize + 1u),
-      cv::Point(kInvDilationSize, kInvDilationSize));
+    cv::morphologyEx(convexity_map, convexity_map, cv::MORPH_OPEN, element);
+  }
+  if (final_edge_map_params_.use_morphological_closing) {
+    cv::Mat element = cv::getStructuringElement(
+        cv::MORPH_RECT,
+        cv::Size(2u * final_edge_map_params_.morphological_closing_size + 1u,
+                 2u * final_edge_map_params_.morphological_closing_size + 1u),
+        cv::Point(final_edge_map_params_.morphological_closing_size,
+                  final_edge_map_params_.morphological_closing_size));
+    cv::morphologyEx(distance_map, distance_map, cv::MORPH_CLOSE, element);
+  }
 
-  cv::morphologyEx(concavity_map, concavity_map, cv::MORPH_OPEN, element);
-  element = cv::getStructuringElement(
-      cv::MORPH_RECT,
-      cv::Size(2u * kDilationSize + 1u, 2u * kDilationSize + 1u),
-      cv::Point(kDilationSize, kDilationSize));
-  // cv::dilate(distance_map, distance_map, element);
-  cv::morphologyEx(distance_map, distance_map, cv::MORPH_CLOSE, element);
-
-  *edge_map = concavity_map - distance_map;
+  *edge_map = convexity_map - distance_map;
   if (final_edge_map_params_.display) {
     static const std::string kWindowName = "FinalEdgeMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
@@ -419,14 +428,13 @@ void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& concavity_map,
 }
 
 void DepthSegmenter::findBlobs(const cv::Mat& binary,
-                               std::vector<std::vector<cv::Point2i> >* labels) {
+                               std::vector<std::vector<cv::Point2i>>* labels) {
   labels->clear();
-
   cv::Mat label_image;
   binary.convertTo(label_image, CV_32SC1);
 
   // Labels start at 2 as we use 0 for background and 1 for unlabled.
-  int label_count = 2;
+  size_t label_count = 2u;
   for (size_t y = 0u; y < label_image.rows; ++y) {
     for (size_t x = 0u; x < label_image.cols; ++x) {
       if (label_image.at<int>(y, x) != 1) {
@@ -478,7 +486,7 @@ void DepthSegmenter::labelMap(const cv::Mat& edge_map, cv::Mat* labeled_map) {
   cv::RNG rng(12345);
   cv::Mat binary_edge_map;
 
-  std::vector<std::vector<cv::Point2i> > labels;
+  std::vector<std::vector<cv::Point2i>> labels;
   cv::threshold(edge_map, binary_edge_map, 0.0, 1.0, cv::THRESH_BINARY);
   findBlobs(binary_edge_map, &labels);
   cv::Mat output = cv::Mat::zeros(binary_edge_map.size(), CV_8UC3);
