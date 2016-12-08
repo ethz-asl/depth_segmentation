@@ -340,9 +340,9 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
     cv::Mat concavity_mask(depth_map.size(), CV_32FC1);
     cv::Mat convexity_mask(depth_map.size(), CV_32FC1);
 
+    // Split the projected vector images into convex and concave regions/masks.
     cv::threshold(vector_projection, convexity_mask, 0.0f, 1.0f,
                   cv::THRESH_BINARY);
-
     cv::threshold(vector_projection, concavity_mask, 0.0f, 1.0f,
                   cv::THRESH_BINARY_INV);
 
