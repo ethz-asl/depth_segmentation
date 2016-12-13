@@ -4,6 +4,7 @@
 #include <string>
 
 #include <glog/logging.h>
+#include <opencv2/highgui.hpp>
 #include <opencv2/rgbd.hpp>
 #include <opencv2/viz/vizcore.hpp>
 
@@ -82,6 +83,9 @@ struct IsNotNan {
 };
 
 void visualizeDepthMap(const cv::Mat& depth_map, cv::viz::Viz3d* viz_3d) {
+  CHECK(!depth_map.empty());
+  CHECK_EQ(depth_map.type(), CV_32FC3);
+  CHECK_NOTNULL(viz_3d);
   viz_3d->setBackgroundColor(cv::viz::Color::gray());
   viz_3d->showWidget("cloud",
                      cv::viz::WCloud(depth_map, cv::viz::Color::red()));
@@ -92,11 +96,17 @@ void visualizeDepthMap(const cv::Mat& depth_map, cv::viz::Viz3d* viz_3d) {
 void visualizeDepthMapWithNormals(const cv::Mat& depth_map,
                                   const cv::Mat& normals,
                                   cv::viz::Viz3d* viz_3d) {
+  CHECK(!depth_map.empty());
+  CHECK_EQ(depth_map.type(), CV_32FC3);
+  CHECK(!normals.empty());
+  CHECK_EQ(normals.type(), CV_32FC3);
+  CHECK_EQ(depth_map.size(), normals.size());
+  CHECK_NOTNULL(viz_3d);
   viz_3d->setBackgroundColor(cv::viz::Color::gray());
   viz_3d->showWidget("cloud",
                      cv::viz::WCloud(depth_map, cv::viz::Color::red()));
   viz_3d->showWidget("normals",
-                     cv::viz::WCloudNormals(depth_map, normals, 1, 0.001f,
+                     cv::viz::WCloudNormals(depth_map, normals, 50, 0.02f,
                                             cv::viz::Color::green()));
   viz_3d->showWidget("coo", cv::viz::WCoordinateSystem(1.5));
   viz_3d->spinOnce(0, true);
