@@ -5,7 +5,24 @@ add_definitions(-std=c++11)
 
 find_package(catkin_simple REQUIRED)
 
-catkin_simple(ALL_DEPS_REQUIRED)
+if(APPLE)
+  catkin_simple()
+  set(CMAKE_C_COMPILER clang-omp)
+  set(CMAKE_CXX_COMPILER clang-omp++)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+else()
+  catkin_simple(ALL_DEPS_REQUIRED)
+endif()
+
+# OpenMP
+ # Adapted from http://wiki.ros.org/catkin/migrating_from_rosbuild
+if(OPENMP_FOUND)
+  message(STATUS "OpenMP found! cxx_flags: ${OpenMP_CXX_FLAGS} libs: ${OpenMP_LIBS}")
+  set(OpenMP_FLAGS ${OpenMP_CXX_FLAGS})
+  set(OpenMP_LIBS gomp)
+  add_definitions(-Wno-unknown-pragmas ${OpenMP_FLAGS})
+endif()
 
 cs_add_library(${PROJECT_NAME}
   src/depth_segmentation.cpp
@@ -15,6 +32,7 @@ cs_add_library(${PROJECT_NAME}
 cs_add_executable(${PROJECT_NAME}_node
   src/depth_segmentation_node.cpp
 )
+target_compile_options(${PROJECT_NAME}_node PRIVATE ${OpenMP_FLAGS})
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
 
 # COPY TEST DATA

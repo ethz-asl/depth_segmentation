@@ -2,9 +2,6 @@
 #define DEPTH_SEGMENTATION_COMMON_H_
 
 #include <string>
-// TODO(ff): remove
-#include <chrono>
-#include <iostream>
 
 #include <glog/logging.h>
 #include <opencv2/highgui.hpp>
@@ -30,7 +27,7 @@ struct SurfaceNormalParams {
   }
   size_t window_size = 11u;
   size_t method = SurfaceNormalEstimationMethod::kOwn;
-  bool display = true;
+  bool display = false;
   double distance_factor_threshold = 0.01;
 };
 
@@ -211,28 +208,14 @@ void computeOwnNormals(const SurfaceNormalParams& params,
 
   cv::Mat neighborhood =
       cv::Mat::zeros(3, params.window_size * params.window_size, CV_32FC1);
-
-  // static const std::string kDepthWindowName = "depthTest";
-  // cv::namedWindow(kDepthWindowName, cv::WINDOW_AUTOSIZE);
-  // cv::imshow(kDepthWindowName, depth_map);
-
-  cv::Mat mean_map(depth_map.size(), CV_32FC3);
-  std::chrono::time_point<std::chrono::system_clock> start_nh, end_nh;
-  std::chrono::duration<double> diff_nh;
-  std::chrono::time_point<std::chrono::system_clock> start_cov, end_cov;
-  std::chrono::duration<double> diff_cov;
-  std::chrono::time_point<std::chrono::system_clock> start_eig, end_eig;
-  std::chrono::duration<double> diff_eig;
-  std::chrono::time_point<std::chrono::system_clock> start_tot, end_tot;
-  std::chrono::duration<double> diff_tot;
-
-  start_tot = std::chrono::system_clock::now();
-
   cv::Mat eigenvalues;
   cv::Mat eigenvectors;
   cv::Mat covariance(3, 3, CV_32FC1);
   cv::Vec3f mean;
   cv::Vec3f mid_point;
+
+#pragma omp parallel for private(neighborhood, eigenvalues, eigenvectors, \
+                                 covariance, mean, mid_point)
   for (size_t y = 0u; y < depth_map.rows; ++y) {
     for (size_t x = 0u; x < depth_map.cols; ++x) {
       mid_point = depth_map.at<cv::Vec3f>(y, x);
@@ -245,22 +228,13 @@ void computeOwnNormals(const SurfaceNormalParams& params,
       mean[1] = 0.0f;
       mean[2] = 0.0f;
 
-      start_nh = std::chrono::system_clock::now();
       size_t neighborhood_size =
           findNeighborhood(depth_map, params.window_size, max_distance, x, y,
                            &neighborhood, &mean);
-      end_nh = std::chrono::system_clock::now();
-      diff_nh += end_nh - start_nh;
       if (neighborhood_size > 1) {
-        start_cov = std::chrono::system_clock::now();
         computeCovariance(neighborhood, mean, neighborhood_size, &covariance);
-        end_cov = std::chrono::system_clock::now();
-        diff_cov += end_cov - start_cov;
         // Compute Eigen vectors.
-        start_eig = std::chrono::system_clock::now();
         cv::eigen(covariance, eigenvalues, eigenvectors);
-        end_eig = std::chrono::system_clock::now();
-        diff_eig += end_eig - start_eig;
         // Get the Eigenvector corresponding to the smallest Eigenvalue.
         const size_t n_th_eigenvector = 2;
         for (size_t coordinate = 0; coordinate < 3; ++coordinate) {
@@ -276,17 +250,7 @@ void computeOwnNormals(const SurfaceNormalParams& params,
       }
     }
   }
-  end_tot = std::chrono::system_clock::now();
-  diff_tot = end_tot - start_tot;
-  std::cout << "nh: " << diff_nh.count() << " s" << std::endl;
-  std::cout << "cov: " << diff_cov.count() << " s" << std::endl;
-  std::cout << "eig: " << diff_eig.count() << " s" << std::endl;
-  std::cout << "tot: " << diff_tot.count() << " s" << std::endl;
-  // cv::viz::Viz3d viz_3d("Pointcloud with Normals");
-  // visualizeDepthMapWithNormals(depth_map, *normals, &viz_3d);
-  // cv::waitKey(0);
 }
-
 }  // depth_segmentation
 
 #endif  // DEPTH_SEGMENTATION_COMMON_H_
