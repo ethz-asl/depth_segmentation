@@ -80,7 +80,7 @@ cs_add_executable(${PROJECT_NAME}_node
   src/depth_segmentation_node.cpp
 )
 
-target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${Qt5_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_node ${Qt5_LIBRARIES})
 
 cs_install()
 cs_export()
