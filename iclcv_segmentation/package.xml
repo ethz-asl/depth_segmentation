@@ -18,6 +18,7 @@
 
   <depend>cv_bridge</depend>
   <depend>iclcv_catkin</depend>
+  <depend>opencv3_catkin</depend>
   <depend>pcl_catkin</depend>
   <depend>roscpp</depend>
 </package>

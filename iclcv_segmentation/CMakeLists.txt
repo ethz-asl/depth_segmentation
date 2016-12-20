@@ -67,6 +67,7 @@ IF(ICL_ALL_QT_LIBS_FOUND)
   FOREACH(M ${ICL_QT_MODULES})
     LIST(APPEND Qt5_LIBRARIES ${ICLQt5${M}LibAbs})
   ENDFOREACH()
+  add_definitions(-DICL_HAVE_QT)
 ENDIF()
 
 include_directories(${Qt5Multimedia_INCLUDE_DIRS}
@@ -76,6 +77,9 @@ include_directories(${Qt5Multimedia_INCLUDE_DIRS}
                     ${Qt5Core_INCLUDE_DIRS})
 
 catkin_simple(ALL_DEPS_REQUIRED)
+IF(opencv3_catkin_FOUND)
+  add_definitions(-DICL_HAVE_OPENGL)
+ENDIF()
 cs_add_executable(${PROJECT_NAME}_node
   src/depth_segmentation_node.cpp
 )
