@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(iclcv_segmentation)
 
 add_definitions(-std=c++11)
+add_definitions(-DICL_HAVE_OPENGL)
 
 find_package(catkin_simple REQUIRED)
 
@@ -67,6 +68,7 @@ IF(ICL_ALL_QT_LIBS_FOUND)
   FOREACH(M ${ICL_QT_MODULES})
     LIST(APPEND Qt5_LIBRARIES ${ICLQt5${M}LibAbs})
   ENDFOREACH()
+  add_definitions(-DICL_HAVE_QT)
 ENDIF()
 
 include_directories(${Qt5Multimedia_INCLUDE_DIRS}
@@ -76,11 +78,12 @@ include_directories(${Qt5Multimedia_INCLUDE_DIRS}
                     ${Qt5Core_INCLUDE_DIRS})
 
 catkin_simple(ALL_DEPS_REQUIRED)
+
 cs_add_executable(${PROJECT_NAME}_node
   src/depth_segmentation_node.cpp
 )
 
-target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES} ${Qt5_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}_node ${Qt5_LIBRARIES})
 
 cs_install()
 cs_export()

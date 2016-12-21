@@ -131,23 +131,33 @@ class DepthSegmenter {
  public:
   DepthSegmenter(const DepthCamera& depth_camera,
                  const SurfaceNormalParams& surface_normal_params,
-                 const MaxDistanceMapParams& max_distance_map_params)
+                 const MaxDistanceMapParams& max_distance_map_params,
+                 const MinConvexityMapParams& min_convexity_map_params,
+                 const FinalEdgeMapParams& final_edge_map_params,
+                 const LabelMapParams& label_map_params)
       : depth_camera_(depth_camera),
         surface_normal_params_(surface_normal_params),
-        max_distance_map_params_(max_distance_map_params) {
-    CHECK_EQ(surface_normal_params.window_size % 2, 1);
-    CHECK_EQ(max_distance_map_params_.window_size % 2, 1);
+        max_distance_map_params_(max_distance_map_params),
+        min_convexity_map_params_(min_convexity_map_params),
+        final_edge_map_params_(final_edge_map_params),
+        label_map_params_(label_map_params) {
+    CHECK_EQ(surface_normal_params.window_size % 2u, 1u);
+    CHECK_EQ(max_distance_map_params_.window_size % 2u, 1u);
   };
   void initialize();
   void computeDepthMap(const cv::Mat& depth_image, cv::Mat* depth_map);
   void computeMaxDistanceMap(const cv::Mat& image, cv::Mat* max_distance_map);
   void computeNormalMap(const cv::Mat& depth_map, cv::Mat* normal_map);
-  void computeMinConcavityMap(const cv::Mat& image, cv::Mat* concavity_map);
-  void convertToConcavityAwareNormalMap(const cv::Mat& concavity_map,
-                                        const cv::Mat& normal_map,
-                                        cv::Mat* combined_map);
+  void computeMinConvexityMap(const cv::Mat& depth_map,
+                              const cv::Mat& normal_map,
+                              cv::Mat* min_convexity_map);
+  void computeFinalEdgeMap(const cv::Mat& convexity_map,
+                           const cv::Mat& distance_map, cv::Mat* edge_map);
   void edgeMap(const cv::Mat& image, cv::Mat* edge_map);
   void labelMap(const cv::Mat& edge_map, cv::Mat* labeled_map);
+  void inpaintImage(const cv::Mat& image, cv::Mat* inpainted);
+  void findBlobs(const cv::Mat& binary,
+                 std::vector<std::vector<cv::Point2i>>* labels);
   inline DepthCamera getDepthCamera() const { return depth_camera_; }
 
  private:
@@ -155,6 +165,9 @@ class DepthSegmenter {
 
   const SurfaceNormalParams& surface_normal_params_;
   const MaxDistanceMapParams& max_distance_map_params_;
+  const MinConvexityMapParams& min_convexity_map_params_;
+  const FinalEdgeMapParams& final_edge_map_params_;
+  const LabelMapParams& label_map_params_;
 
   cv::rgbd::RgbdNormals rgbd_normals_;
 };
