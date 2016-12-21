@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(iclcv_segmentation)
 
 add_definitions(-std=c++11)
+add_definitions(-DICL_HAVE_OPENGL)
 
 find_package(catkin_simple REQUIRED)
 
@@ -77,7 +78,7 @@ include_directories(${Qt5Multimedia_INCLUDE_DIRS}
                     ${Qt5Core_INCLUDE_DIRS})
 
 catkin_simple(ALL_DEPS_REQUIRED)
-add_definitions(-DICL_HAVE_OPENGL)
+
 cs_add_executable(${PROJECT_NAME}_node
   src/depth_segmentation_node.cpp
 )
