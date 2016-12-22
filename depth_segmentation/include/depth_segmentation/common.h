@@ -23,7 +23,7 @@ struct SurfaceNormalParams {
   SurfaceNormalParams() {
     CHECK_EQ(window_size % 2u, 1u);
     // CHECK_LT(window_size, 8u);
-    // CHECK_GT(window_size, 0u);
+    CHECK_GT(window_size, 1u);
   }
   size_t window_size = 11u;
   size_t method = SurfaceNormalEstimationMethod::kOwn;
@@ -231,13 +231,13 @@ void computeOwnNormals(const SurfaceNormalParams& params,
       size_t neighborhood_size =
           findNeighborhood(depth_map, params.window_size, max_distance, x, y,
                            &neighborhood, &mean);
-      if (neighborhood_size > 1) {
+      if (neighborhood_size > 1u) {
         computeCovariance(neighborhood, mean, neighborhood_size, &covariance);
         // Compute Eigen vectors.
         cv::eigen(covariance, eigenvalues, eigenvectors);
         // Get the Eigenvector corresponding to the smallest Eigenvalue.
-        const size_t n_th_eigenvector = 2;
-        for (size_t coordinate = 0; coordinate < 3; ++coordinate) {
+        const size_t n_th_eigenvector = 2u;
+        for (size_t coordinate = 0u; coordinate < 3u; ++coordinate) {
           normals->at<cv::Vec3f>(y, x)[coordinate] =
               eigenvectors.at<float>(n_th_eigenvector, coordinate);
         }
