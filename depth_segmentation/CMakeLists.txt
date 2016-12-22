@@ -27,13 +27,15 @@ endif()
 cs_add_library(${PROJECT_NAME}
   src/depth_segmentation.cpp
 )
+target_link_libraries(${PROJECT_NAME} ${OpenMP_LIBS})
+target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_FLAGS})
+
 
 # add_definitions(-DWRITE_IMAGES)
 cs_add_executable(${PROJECT_NAME}_node
   src/depth_segmentation_node.cpp
 )
-target_compile_options(${PROJECT_NAME}_node PRIVATE ${OpenMP_FLAGS})
-target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME} ${OpenMP_LIBS})
+target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
 
 # COPY TEST DATA
 # TODO(ff): We should move the test data to an external repo or a cloud at some point.
@@ -47,7 +49,6 @@ target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME} ${OpenMP_LIBS})
 # UNIT TESTS
 catkin_add_gtest(test_depth_segmentation test/test_depth_segmentation.cpp)
 target_link_libraries(test_depth_segmentation ${PROJECT_NAME} pthread)
-# add_dependencies(test_depth_segmentation test_data)
 
 cs_install()
 cs_export()
