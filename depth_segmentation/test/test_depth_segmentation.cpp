@@ -98,7 +98,7 @@ TEST_F(DepthSegmentationTest, testNormals) {
 
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, normals, &viz_3d);
-  cv::waitKey(1);
+  // cv::waitKey(1);
 
   for (size_t i = 0; i < kNormalImageHeight * kNormalImageWidth; ++i) {
     cv::Vec3f normal = normals.at<cv::Vec3f>(i);
@@ -154,7 +154,7 @@ TEST_F(DepthSegmentationTest, testNormals2) {
 
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, normals, &viz_3d);
-  cv::waitKey(1);
+  // cv::waitKey(1);
 
   EXPECT_EQ(cv::countNonZero(normals != expected_normals), 0);
 }
@@ -230,7 +230,7 @@ TEST_F(DepthSegmentationTest, testConvexity) {
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, concave_normals, &viz_3d);
   // cv::viz::writeCloud("depth_map.ply", depth_map);
-  cv::waitKey(1);
+  // cv::waitKey(1);
 
   EXPECT_EQ(cv::countNonZero(expected_convexity != min_convexity_map), 0);
 }
