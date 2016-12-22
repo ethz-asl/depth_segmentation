@@ -16,7 +16,7 @@ enum SurfaceNormalEstimationMethod {
   kLinemod = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD,
   kFals = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS,
   kSri = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI,
-  kOwn = 4,  // TODO(ff): Check what the proper value should be here.
+  kOwn = 3,
 };
 
 struct SurfaceNormalParams {
