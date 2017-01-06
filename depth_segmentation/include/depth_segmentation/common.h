@@ -22,8 +22,10 @@ enum SurfaceNormalEstimationMethod {
 struct SurfaceNormalParams {
   SurfaceNormalParams() {
     CHECK_EQ(window_size % 2u, 1u);
-    // CHECK_LT(window_size, 8u);
     CHECK_GT(window_size, 1u);
+    if (method != SurfaceNormalEstimationMethod::kOwn) {
+      CHECK_LT(window_size, 8u);
+    }
   }
   size_t window_size = 11u;
   size_t method = SurfaceNormalEstimationMethod::kOwn;
@@ -150,7 +152,7 @@ size_t findNeighborhood(const cv::Mat& depth_map, const size_t window_size,
   CHECK(!depth_map.empty());
   CHECK_GT(window_size, 0u);
   CHECK_EQ(window_size % 2u, 1u);
-  // CHECK_GT(max_distance, 0.0f);
+  CHECK_GE(max_distance, 0.0f);
   CHECK_GE(x, 0u);
   CHECK_GE(y, 0u);
   CHECK_LT(x, depth_map.cols);
@@ -246,7 +248,7 @@ void computeOwnNormals(const SurfaceNormalParams& params,
           normals->at<cv::Vec3f>(y, x) = -normals->at<cv::Vec3f>(y, x);
         }
       } else {
-        // TODO(ff): Set normal to nan?}
+        // TODO(ff): Set normal to nan?
       }
     }
   }

@@ -100,13 +100,20 @@ TEST_F(DepthSegmentationTest, testNormals) {
   visualizeDepthMapWithNormals(depth_map, normals, &viz_3d);
   // cv::waitKey(1);
 
-  for (size_t i = 0; i < kNormalImageHeight * kNormalImageWidth; ++i) {
-    cv::Vec3f normal = normals.at<cv::Vec3f>(i);
-    cv::Vec3f expected_normal = expected_normals.at<cv::Vec3f>(i);
-    for (size_t j = 0; j < normals.channels(); ++j) {
-      // TODO(ff): This value seems rather large, investigate why we get so
-      // large differences.
-      EXPECT_NEAR(normal(j), expected_normal(j), 1.0e-3);
+  for (size_t y = 0u; y < kNormalImageHeight; ++y) {
+    for (size_t x = 0u; x < kNormalImageWidth; ++x) {
+      cv::Vec3f normal = normals.at<cv::Vec3f>(y, x);
+      cv::Vec3f expected_normal = expected_normals.at<cv::Vec3f>(y, x);
+      if (x < kNormalImageWidth / 2u) {
+        for (size_t k = 0u; k < normals.channels(); ++k) {
+          // Be generous with the normal error at plane intersection.
+          EXPECT_NEAR(normal(k), expected_normal(k), 1.0e-3);
+        }
+      } else {
+        for (size_t k = 0u; k < normals.channels(); ++k) {
+          EXPECT_NEAR(normal(k), expected_normal(k), 1.0e-5);
+        }
+      }
     }
   }
 }
@@ -229,7 +236,6 @@ TEST_F(DepthSegmentationTest, testConvexity) {
   cv::imshow(kConvexityGTWindowName, expected_convexity);
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, concave_normals, &viz_3d);
-  // cv::viz::writeCloud("depth_map.ply", depth_map);
   // cv::waitKey(1);
 
   EXPECT_EQ(cv::countNonZero(expected_convexity != min_convexity_map), 0);
