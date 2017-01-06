@@ -172,6 +172,9 @@ size_t findNeighborhood(const cv::Mat& depth_map, const size_t window_size,
         continue;
       }
 
+      CHECK_LT(y_filter_idx, depth_map.rows);
+      CHECK_LT(x_filter_idx, depth_map.cols);
+
       cv::Vec3f filter_point =
           depth_map.at<cv::Vec3f>(y_filter_idx, x_filter_idx);
 
