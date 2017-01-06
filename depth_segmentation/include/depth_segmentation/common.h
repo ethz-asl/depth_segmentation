@@ -13,8 +13,8 @@ namespace depth_segmentation {
 const static std::string kDebugWindowName = "DebugImages";
 
 enum SurfaceNormalEstimationMethod {
-  kLinemod = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD,
   kFals = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS,
+  kLinemod = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD,
   kSri = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI,
   kOwn = 3,
 };
