@@ -15,16 +15,16 @@ class ShitTest : public ::testing::Test {
 };
 
 TEST_F(ShitTest, TestThisShit) {
-  cv::Mat cov_mat_shit(3, 3, CV_32FC1);
-  cov_mat_shit.setTo(0.0f);
+  // cv::Mat cov_mat_shit(3, 3, CV_32FC1);
+  // cov_mat_shit.setTo(0.0f);
 
-  // cv::Mat eigenvalues;
-  // cv::Mat eigenvectors;
-  // cv::Mat covariance(3, 3, CV_32FC1, 0.0f);
-  // covariance.at<float>(0,0) = 1.0f;
-  // covariance.at<float>(1,1) = 1.0f;
-  // covariance.at<float>(2,2) = 1.0f;
-  // cv::eigen(covariance, eigenvalues, eigenvectors);
+  cv::Mat eigenvalues(3, 1, CV_32FC1, 0.0f);
+  cv::Mat eigenvectors(3, 3, CV_32FC1, 0.0f);
+  cv::Mat covariance(3, 3, CV_32FC1, 0.0f);
+  covariance.at<float>(0,0) = 1.0f;
+  covariance.at<float>(1,1) = 1.0f;
+  covariance.at<float>(2,2) = 1.0f;
+  cv::eigen(covariance, eigenvalues, eigenvectors);
 }
 
 int main(int argc, char** argv) {
