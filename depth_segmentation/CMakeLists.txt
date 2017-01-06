@@ -16,7 +16,7 @@ else()
 endif()
 
 # OpenMP
- # Adapted from http://wiki.ros.org/catkin/migrating_from_rosbuild
+# Adapted from http://wiki.ros.org/catkin/migrating_from_rosbuild
 if(OPENMP_FOUND)
   message(STATUS "OpenMP found! cxx_flags: ${OpenMP_CXX_FLAGS} libs: ${OpenMP_LIBS}")
   set(OpenMP_FLAGS ${OpenMP_CXX_FLAGS})
