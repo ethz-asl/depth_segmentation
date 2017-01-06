@@ -173,7 +173,8 @@ size_t findNeighborhood(const cv::Mat& depth_map, const size_t window_size,
       if (x_filter_idx < 0 || x_filter_idx >= depth_map.cols) {
         continue;
       }
-
+      CHECK_GE(y_filter_idx, 0u);
+      CHECK_GE(x_filter_idx, 0u);
       CHECK_LT(y_filter_idx, depth_map.rows);
       CHECK_LT(x_filter_idx, depth_map.cols);
 
@@ -216,6 +217,7 @@ void computeOwnNormals(const SurfaceNormalParams& params,
   cv::Mat eigenvalues;
   cv::Mat eigenvectors;
   cv::Mat covariance(3, 3, CV_32FC1);
+  covariance = cv::Mat::zeros(3, 3, CV_32FC1);
   cv::Vec3f mean;
   cv::Vec3f mid_point;
 
