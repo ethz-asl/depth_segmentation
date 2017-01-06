@@ -119,12 +119,12 @@ void visualizeDepthMapWithNormals(const cv::Mat& depth_map,
 void computeCovariance(const cv::Mat& neighborhood, const cv::Vec3f& mean,
                        const size_t neighborhood_size, cv::Mat* covariance) {
   CHECK(!neighborhood.empty());
-  CHECK_GT(neighborhood_size, 0);
+  CHECK_GT(neighborhood_size, 0u);
   CHECK_NOTNULL(covariance);
 
   *covariance = cv::Mat::zeros(3, 3, CV_32F);
 
-  for (size_t i = 0; i < neighborhood_size; ++i) {
+  for (size_t i = 0u; i < neighborhood_size; ++i) {
     cv::Vec3f point;
     point[0] = neighborhood.at<float>(0, i) - mean[0];
     point[1] = neighborhood.at<float>(1, i) - mean[1];
@@ -160,7 +160,7 @@ size_t findNeighborhood(const cv::Mat& depth_map, const size_t window_size,
   CHECK_NOTNULL(neighborhood);
   CHECK_NOTNULL(mean);
 
-  size_t neighborhood_size = 0;
+  size_t neighborhood_size = 0u;
   *neighborhood = cv::Mat::zeros(3, window_size * window_size, CV_32FC1);
   cv::Vec3f mid_point = depth_map.at<cv::Vec3f>(y, x);
   for (size_t y_idx = 0u; y_idx < window_size; ++y_idx) {
