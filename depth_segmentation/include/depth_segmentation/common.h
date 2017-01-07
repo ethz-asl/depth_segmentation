@@ -86,6 +86,16 @@ struct IsNotNan {
   }
 };
 
+struct Params {
+  Params()
+      : final_edge(), label(), max_distance(), min_convexity(), normals() {}
+  FinalEdgeMapParams final_edge;
+  LabelMapParams label;
+  MaxDistanceMapParams max_distance;
+  MinConvexityMapParams min_convexity;
+  SurfaceNormalParams normals;
+};
+
 void visualizeDepthMap(const cv::Mat& depth_map, cv::viz::Viz3d* viz_3d) {
   CHECK(!depth_map.empty());
   CHECK_EQ(depth_map.type(), CV_32FC3);
