@@ -151,13 +151,11 @@ void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
 
 void DepthSegmenter::initialize() {
   CHECK(depth_camera_.initialized());
-  CHECK_EQ(surface_normal_params_.window_size % 2, 1);
-  if (surface_normal_params_.method != SurfaceNormalEstimationMethod::kOwn) {
-    rgbd_normals_ = cv::rgbd::RgbdNormals(
-        depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
-        depth_camera_.getCameraMatrix(), surface_normal_params_.window_size,
-        surface_normal_params_.method);
-  }
+  CHECK_EQ(params_.normals.window_size % 2, 1);
+  rgbd_normals_ = cv::rgbd::RgbdNormals(
+      depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
+      depth_camera_.getCameraMatrix(), params_.normals.window_size,
+      params_.normals.method);
   LOG(INFO) << "DepthSegmenter initialized";
 }
 
@@ -180,11 +178,11 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
   CHECK_NOTNULL(max_distance_map);
   CHECK_EQ(max_distance_map->type(), CV_32FC1);
   // Check if window_size is odd.
-  CHECK_EQ(max_distance_map_params_.window_size % 2, 1);
+  CHECK_EQ(params_.max_distance.window_size % 2, 1);
 
   max_distance_map->setTo(cv::Scalar(0.0f));
 
-  const size_t kernel_size = max_distance_map_params_.window_size;
+  const size_t kernel_size = params_.max_distance.window_size;
   const size_t n_kernels = kernel_size * kernel_size - 1u;
 
   // Define the n kernels and compute the filtered images.
@@ -204,7 +202,7 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
     std::vector<cv::Mat> channels(3);
     cv::split(filtered_image, channels);
     cv::Mat distance_map(depth_map.size(), CV_32FC1);
-    if (max_distance_map_params_.ignore_nan_coordinates) {
+    if (params_.max_distance.ignore_nan_coordinates) {
       // Ignore nan values for the distance calculation.
       cv::Mat mask_0 = cv::Mat(channels[0] == channels[0]);
       cv::Mat mask_1 = cv::Mat(channels[1] == channels[1]);
@@ -222,7 +220,7 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
                      channels[2].mul(channels[2]);
     }
 
-    if (max_distance_map_params_.exclude_nan_as_max_distance) {
+    if (params_.max_distance.exclude_nan_as_max_distance) {
       cv::Mat mask = cv::Mat(distance_map == distance_map);
       mask.convertTo(mask, CV_32FC1);
       distance_map = mask.mul(distance_map);
@@ -236,7 +234,7 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
   cv::split(depth_map, channels);
 
   // Threshold the max_distance_map to get an edge map.
-  if (max_distance_map_params_.use_threshold) {
+  if (params_.max_distance.use_threshold) {
     for (size_t i = 0u; i < depth_map.cols * depth_map.rows; ++i) {
       // Threshold the distance map based on Nguyen et al. (2012) noise model.
       // TODO(ff): Theta should be the angle between the normal and the camera
@@ -245,22 +243,21 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
       static constexpr float theta = 30.f * CV_PI / 180.f;
       float z = (channels[2]).at<float>(i);
       float sigma_axial_noise =
-          max_distance_map_params_.sensor_noise_param_1 +
-          max_distance_map_params_.sensor_noise_param_2 *
-              (z - max_distance_map_params_.sensor_min_distance) *
-              (z - max_distance_map_params_.sensor_min_distance) +
-          max_distance_map_params_.sensor_noise_param_3 / cv::sqrt(z) * theta *
+          params_.max_distance.sensor_noise_param_1 +
+          params_.max_distance.sensor_noise_param_2 *
+              (z - params_.max_distance.sensor_min_distance) *
+              (z - params_.max_distance.sensor_min_distance) +
+          params_.max_distance.sensor_noise_param_3 / cv::sqrt(z) * theta *
               theta / (CV_PI / 2.0f - theta) * (CV_PI / 2.0f - theta);
       if (max_distance_map->at<float>(i) >
-          sigma_axial_noise *
-              max_distance_map_params_.noise_thresholding_factor) {
+          sigma_axial_noise * params_.max_distance.noise_thresholding_factor) {
         max_distance_map->at<float>(i) = 1.0f;
       } else {
         max_distance_map->at<float>(i) = 0.0f;
       }
     }
   }
-  if (max_distance_map_params_.display) {
+  if (params_.max_distance.display) {
     static const std::string kWindowName = "MaxDistanceMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     cv::imshow(kWindowName, *max_distance_map);
@@ -272,23 +269,19 @@ void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
                                       cv::Mat* normal_map) {
   CHECK(!depth_map.empty());
   CHECK(depth_map.type() == CV_32FC3 &&
-            (surface_normal_params_.method ==
-                 SurfaceNormalEstimationMethod::kFals ||
-             surface_normal_params_.method ==
-                 SurfaceNormalEstimationMethod::kSri ||
-             surface_normal_params_.method ==
-                 SurfaceNormalEstimationMethod::kOwn) ||
+            (params_.normals.method == SurfaceNormalEstimationMethod::kFals ||
+             params_.normals.method == SurfaceNormalEstimationMethod::kSri ||
+             params_.normals.method == SurfaceNormalEstimationMethod::kOwn) ||
         (depth_map.type() == CV_32FC1 || depth_map.type() == CV_16UC1 ||
          depth_map.type() == CV_32FC3) &&
-            surface_normal_params_.method ==
-                SurfaceNormalEstimationMethod::kLinemod);
+            params_.normals.method == SurfaceNormalEstimationMethod::kLinemod);
   CHECK_NOTNULL(normal_map);
-  if (surface_normal_params_.method != SurfaceNormalEstimationMethod::kOwn) {
+  if (params_.normals.method != SurfaceNormalEstimationMethod::kOwn) {
     rgbd_normals_(depth_map, *normal_map);
   } else {
-    computeOwnNormals(surface_normal_params_, depth_map, normal_map);
+    computeOwnNormals(params_.normals, depth_map, normal_map);
   }
-  if (surface_normal_params_.display) {
+  if (params_.normals.display) {
     static const std::string kWindowName = "NormalMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     // Taking the negative values of the normal map, as all normals point in
@@ -310,15 +303,15 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
   CHECK_EQ(min_convexity_map->type(), CV_32FC1);
   CHECK_EQ(depth_map.size(), min_convexity_map->size());
   // Check if window_size is odd.
-  CHECK_EQ(min_convexity_map_params_.window_size % 2, 1);
+  CHECK_EQ(params_.min_convexity.window_size % 2, 1);
   min_convexity_map->setTo(cv::Scalar(10.0f));
 
-  const size_t kernel_size = min_convexity_map_params_.window_size +
-                             (min_convexity_map_params_.step_size - 1u) *
-                                 (min_convexity_map_params_.window_size - 1u);
-  const size_t n_kernels = min_convexity_map_params_.window_size *
-                               min_convexity_map_params_.window_size -
-                           1u;
+  const size_t kernel_size = params_.min_convexity.window_size +
+                             (params_.min_convexity.step_size - 1u) *
+                                 (params_.min_convexity.window_size - 1u);
+  const size_t n_kernels =
+      params_.min_convexity.window_size * params_.min_convexity.window_size -
+      1u;
   // Define the n point-wise distance kernels and compute the filtered images.
   // The kernels for i look as follows (e.g. window_size = 5, i = 6):
   //     0  0  0  0  0
@@ -328,7 +321,7 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
   //     0  0  0  0  0
   for (size_t i = 0u; i < n_kernels + 1u;
        i += static_cast<size_t>(i % kernel_size == kernel_size) * kernel_size +
-            min_convexity_map_params_.step_size) {
+            params_.min_convexity.step_size) {
     if (i == n_kernels / 2u) {
       continue;
     }
@@ -353,7 +346,8 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
     cv::Mat concavity_mask(depth_map.size(), CV_32FC1);
     cv::Mat convexity_mask(depth_map.size(), CV_32FC1);
 
-    // Split the projected vector images into convex and concave regions/masks.
+    // Split the projected vector images into convex and concave
+    // regions/masks.
     cv::threshold(vector_projection, convexity_mask, 0.0f, 1.0f,
                   cv::THRESH_BINARY);
     cv::threshold(vector_projection, concavity_mask, 0.0f, 1.0f,
@@ -382,25 +376,23 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
     cv::min(*min_convexity_map, convexity_map, *min_convexity_map);
   }
 
-  if (min_convexity_map_params_.use_threshold) {
+  if (params_.min_convexity.use_threshold) {
     cv::threshold(*min_convexity_map, *min_convexity_map,
-                  min_convexity_map_params_.min_convexity_threshold, 1.0f,
-                  cv::THRESH_BINARY);
+                  params_.min_convexity.threshold, 1.0f, cv::THRESH_BINARY);
   }
 
-  if (min_convexity_map_params_.use_morphological_opening) {
+  if (params_.min_convexity.use_morphological_opening) {
     cv::Mat element = cv::getStructuringElement(
         cv::MORPH_RECT,
-        cv::Size(
-            2u * min_convexity_map_params_.morphological_opening_size + 1u,
-            2u * min_convexity_map_params_.morphological_opening_size + 1u),
-        cv::Point(min_convexity_map_params_.morphological_opening_size,
-                  min_convexity_map_params_.morphological_opening_size));
+        cv::Size(2u * params_.min_convexity.morphological_opening_size + 1u,
+                 2u * params_.min_convexity.morphological_opening_size + 1u),
+        cv::Point(params_.min_convexity.morphological_opening_size,
+                  params_.min_convexity.morphological_opening_size));
     cv::morphologyEx(*min_convexity_map, *min_convexity_map, cv::MORPH_OPEN,
                      element);
   }
 
-  if (min_convexity_map_params_.display) {
+  if (params_.min_convexity.display) {
     static const std::string kWindowName = "MinConcavityMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     cv::imshow(kWindowName, *min_convexity_map);
@@ -417,28 +409,28 @@ void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
   CHECK_EQ(distance_map.type(), CV_32FC1);
   CHECK_EQ(convexity_map.size(), distance_map.size());
   CHECK_NOTNULL(edge_map);
-  if (final_edge_map_params_.use_morphological_opening) {
+  if (params_.final_edge.use_morphological_opening) {
     cv::Mat element = cv::getStructuringElement(
         cv::MORPH_RECT,
-        cv::Size(2u * final_edge_map_params_.morphological_opening_size + 1u,
-                 2u * final_edge_map_params_.morphological_opening_size + 1u),
-        cv::Point(final_edge_map_params_.morphological_opening_size,
-                  final_edge_map_params_.morphological_opening_size));
+        cv::Size(2u * params_.final_edge.morphological_opening_size + 1u,
+                 2u * params_.final_edge.morphological_opening_size + 1u),
+        cv::Point(params_.final_edge.morphological_opening_size,
+                  params_.final_edge.morphological_opening_size));
 
     cv::morphologyEx(convexity_map, convexity_map, cv::MORPH_OPEN, element);
   }
-  if (final_edge_map_params_.use_morphological_closing) {
+  if (params_.final_edge.use_morphological_closing) {
     cv::Mat element = cv::getStructuringElement(
         cv::MORPH_RECT,
-        cv::Size(2u * final_edge_map_params_.morphological_closing_size + 1u,
-                 2u * final_edge_map_params_.morphological_closing_size + 1u),
-        cv::Point(final_edge_map_params_.morphological_closing_size,
-                  final_edge_map_params_.morphological_closing_size));
+        cv::Size(2u * params_.final_edge.morphological_closing_size + 1u,
+                 2u * params_.final_edge.morphological_closing_size + 1u),
+        cv::Point(params_.final_edge.morphological_closing_size,
+                  params_.final_edge.morphological_closing_size));
     cv::morphologyEx(distance_map, distance_map, cv::MORPH_CLOSE, element);
   }
 
   *edge_map = convexity_map - distance_map;
-  if (final_edge_map_params_.display) {
+  if (params_.final_edge.display) {
     static const std::string kWindowName = "FinalEdgeMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     imshow(kWindowName, *edge_map);
@@ -531,7 +523,7 @@ void DepthSegmenter::labelMap(const cv::Mat& edge_map, cv::Mat* labeled_map) {
       output.at<cv::Vec3b>(y, x)[2] = r;
     }
   }
-  if (label_map_params_.display) {
+  if (params_.label.display) {
     static const std::string kWindowName = "LabelMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     imshow(kWindowName, output);

@@ -35,15 +35,9 @@ class DepthSegmentationNode {
                                  rgb_info_sub_),
         depth_camera_(),
         rgb_camera_(),
-        surface_normal_params_(),
-        max_distance_map_params_(),
-        min_convexity_map_params_(),
-        final_edge_map_params_(),
-        label_map_params_(),
+        params_(),
         camera_tracker_(depth_camera_, rgb_camera_),
-        depth_segmenter_(depth_camera_, surface_normal_params_,
-                         max_distance_map_params_, min_convexity_map_params_,
-                         final_edge_map_params_, label_map_params_) {
+        depth_segmenter_(depth_camera_, params_) {
     image_sync_policy_.registerCallback(
         boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
     camera_info_sync_policy_.registerCallback(
@@ -66,11 +60,7 @@ class DepthSegmentationNode {
   depth_segmentation::DepthCamera depth_camera_;
   depth_segmentation::RgbCamera rgb_camera_;
 
-  depth_segmentation::SurfaceNormalParams surface_normal_params_;
-  depth_segmentation::MaxDistanceMapParams max_distance_map_params_;
-  depth_segmentation::MinConvexityMapParams min_convexity_map_params_;
-  depth_segmentation::FinalEdgeMapParams final_edge_map_params_;
-  depth_segmentation::LabelMapParams label_map_params_;
+  depth_segmentation::Params params_;
 
   depth_segmentation::CameraTracker camera_tracker_;
   depth_segmentation::DepthSegmenter depth_segmenter_;
@@ -165,14 +155,14 @@ class DepthSegmentationNode {
 
         // Compute normal map.
         cv::Mat normal_map(depth_map.size(), CV_32FC3);
-        if (surface_normal_params_.method ==
+        if (params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
-            surface_normal_params_.method ==
+            params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kSri ||
-            surface_normal_params_.method ==
+            params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kOwn) {
           depth_segmenter_.computeNormalMap(depth_map, &normal_map);
-        } else if (surface_normal_params_.method ==
+        } else if (params_.normals.method ==
                    depth_segmentation::SurfaceNormalEstimationMethod::
                        kLinemod) {
           depth_segmenter_.computeNormalMap(cv_depth_image->image, &normal_map);

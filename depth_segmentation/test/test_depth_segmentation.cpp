@@ -10,15 +10,7 @@ namespace depth_segmentation {
 class DepthSegmentationTest : public ::testing::Test {
  protected:
   DepthSegmentationTest()
-      : depth_camera_(),
-        surface_normal_params_(),
-        max_distance_map_params_(),
-        min_convexity_map_params_(),
-        final_edge_map_params_(),
-        label_map_params_(),
-        depth_segmenter_(depth_camera_, surface_normal_params_,
-                         max_distance_map_params_, min_convexity_map_params_,
-                         final_edge_map_params_, label_map_params_) {
+      : depth_camera_(), params_(), depth_segmenter_(depth_camera_, params_) {
     cv::Mat camera_matrix = cv::Mat::zeros(3, 3, CV_32FC1);
     camera_matrix.at<float>(0, 0) = 574.0527954101562f;
     camera_matrix.at<float>(0, 2) = 319.5f;
@@ -26,19 +18,15 @@ class DepthSegmentationTest : public ::testing::Test {
     camera_matrix.at<float>(1, 2) = 239.5f;
     camera_matrix.at<float>(2, 2) = 1.0f;
     depth_camera_.initialize(480u, 640u, CV_32FC1, camera_matrix);
-    min_convexity_map_params_.window_size = 3u;
+    params_.min_convexity.window_size = 3u;
     depth_segmenter_.initialize();
-    surface_normal_params_.method = SurfaceNormalEstimationMethod::kOwn;
-    surface_normal_params_.window_size = 3u;
+    params_.normals.method = SurfaceNormalEstimationMethod::kOwn;
+    params_.normals.window_size = 3u;
   }
   virtual ~DepthSegmentationTest() {}
   virtual void SetUp() {}
 
-  SurfaceNormalParams surface_normal_params_;
-  MaxDistanceMapParams max_distance_map_params_;
-  MinConvexityMapParams min_convexity_map_params_;
-  FinalEdgeMapParams final_edge_map_params_;
-  LabelMapParams label_map_params_;
+  Params params_;
   DepthCamera depth_camera_;
   DepthSegmenter depth_segmenter_;
 };

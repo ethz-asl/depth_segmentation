@@ -57,7 +57,7 @@ struct MinConvexityMapParams {
   bool display = false;
   bool use_morphological_opening = true;
   bool use_threshold = true;
-  double min_convexity_threshold = 0.95;
+  double threshold = 0.95;
 };
 
 struct FinalEdgeMapParams {
