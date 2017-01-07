@@ -26,4 +26,5 @@
   <depend>pcl_catkin</depend>
   <depend>roscpp</depend>
   <depend>tf</depend>
+  <depend>vision_opencv</depend>
 </package>
