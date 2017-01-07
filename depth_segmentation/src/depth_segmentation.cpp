@@ -159,6 +159,84 @@ void DepthSegmenter::initialize() {
   LOG(INFO) << "DepthSegmenter initialized";
 }
 
+void DepthSegmenter::dynamicReconfigureCallback(
+    depth_segmentation::DepthSegmenterConfig& config, uint32_t level) {
+  // Surface normal params.
+  if (config.normals_window_size % 2u != 1u) {
+    LOG(ERROR) << "Set the normals window size to an odd number.";
+    return;
+  }
+  if (config.normals_window_size < 1u) {
+    LOG(ERROR) << "Set the normals window size to an odd value of at least 3.";
+    return;
+  }
+  if (config.normals_method != SurfaceNormalEstimationMethod::kOwn &&
+      config.normals_window_size >= 8u) {
+    LOG(ERROR) << "Only normal method Own supports normal window sizes larger "
+                  "than 7.";
+    return;
+  }
+  params_.normals.method = config.normals_method;
+  params_.normals.distance_factor_threshold =
+      config.normals_distance_factor_threshold;
+  params_.normals.window_size = config.normals_window_size;
+  params_.normals.display = config.normals_display;
+
+  // Max distance map params.
+  if (config.max_distance_window_size % 2u != 1u) {
+    LOG(ERROR) << "Set the max distnace window size to an odd number.";
+    return;
+  }
+  params_.max_distance.display = config.max_distance_display;
+  params_.max_distance.exclude_nan_as_max_distance =
+      config.max_distance_exclude_nan_as_max_distance;
+  params_.max_distance.ignore_nan_coordinates =
+      config.max_distance_ignore_nan_coordinates;
+  params_.max_distance.noise_thresholding_factor =
+      config.max_distance_noise_thresholding_factor;
+  params_.max_distance.sensor_min_distance =
+      config.max_distance_sensor_min_distance;
+  params_.max_distance.sensor_noise_param_1 =
+      config.max_distance_sensor_noise_param_1;
+  params_.max_distance.sensor_noise_param_2 =
+      config.max_distance_sensor_noise_param_2;
+  params_.max_distance.sensor_noise_param_3 =
+      config.max_distance_sensor_noise_param_3;
+  params_.max_distance.use_threshold = config.max_distance_use_threshold;
+  params_.max_distance.window_size = config.max_distance_window_size;
+
+  // Min convexity map params.
+  if (config.min_convexity_window_size % 2u != 1u) {
+    LOG(ERROR) << "Set the min convexity window size to an odd number.";
+    return;
+  }
+  params_.min_convexity.morphological_opening_size =
+      config.min_convexity_morphological_opening_size;
+  params_.min_convexity.step_size = config.min_convexity_step_size;
+  params_.min_convexity.use_morphological_opening =
+      config.min_convexity_use_morphological_opening;
+  params_.min_convexity.use_threshold = config.min_convexity_use_threshold;
+  params_.min_convexity.threshold = config.min_convexity_threshold;
+
+  params_.min_convexity.display = config.min_convexity_display;
+  params_.min_convexity.window_size = config.min_convexity_window_size;
+
+  // Final edge map params.
+  params_.final_edge.morphological_opening_size =
+      config.final_edge_morphological_opening_size;
+  params_.final_edge.morphological_closing_size =
+      config.final_edge_morphological_closing_size;
+  params_.final_edge.use_morphological_opening =
+      config.final_edge_use_morphological_opening;
+  params_.final_edge.use_morphological_closing =
+      config.final_edge_use_morphological_closing;
+
+  // Label map params.
+  params_.label.display = config.label_display;
+
+  LOG(INFO) << "Dynamic Reconfigure Request.";
+}
+
 void DepthSegmenter::computeDepthMap(const cv::Mat& depth_image,
                                      cv::Mat* depth_map) {
   CHECK(!depth_image.empty());
