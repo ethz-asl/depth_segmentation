@@ -217,6 +217,7 @@ void DepthSegmenter::dynamicReconfigureCallback(
       config.min_convexity_use_morphological_opening;
   params_.min_convexity.use_threshold = config.min_convexity_use_threshold;
   params_.min_convexity.threshold = config.min_convexity_threshold;
+  params_.min_convexity.mask_threshold = config.min_convexity_mask_threshold;
 
   params_.min_convexity.display = config.min_convexity_display;
   params_.min_convexity.window_size = config.min_convexity_window_size;
@@ -421,14 +422,23 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
     cv::Mat vector_projection(depth_map.size(), CV_32FC1);
     vector_projection = channels[0] + channels[1] + channels[2];
 
+    // TODO(ff): Check if params_.min_convexity.mask_threshold should be
+    // mid-point distance dependent.
+    // maybe do something like:
+    // std::vector<cv::Mat> depth_map_channels(3);
+    // cv::split(depth_map, depth_map_channels);
+    // vector_projection = vector_projection.mul(depth_map_channels[2]);
+
     cv::Mat concavity_mask(depth_map.size(), CV_32FC1);
     cv::Mat convexity_mask(depth_map.size(), CV_32FC1);
 
     // Split the projected vector images into convex and concave
     // regions/masks.
-    cv::threshold(vector_projection, convexity_mask, 0.0f, 1.0f,
+    cv::threshold(vector_projection, convexity_mask,
+                  params_.min_convexity.mask_threshold, 1.0f,
                   cv::THRESH_BINARY);
-    cv::threshold(vector_projection, concavity_mask, 0.0f, 1.0f,
+    cv::threshold(vector_projection, concavity_mask,
+                  params_.min_convexity.mask_threshold, 1.0f,
                   cv::THRESH_BINARY_INV);
 
     cv::Mat normal_kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32FC1);
