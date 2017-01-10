@@ -166,12 +166,16 @@ class DepthSegmentationNode {
         // Compute normal map.
         cv::Mat normal_map(depth_map.size(), CV_32FC3);
         if (surface_normal_params_.method ==
-                cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS ||
+                depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
             surface_normal_params_.method ==
-                cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI) {
+                depth_segmentation::SurfaceNormalEstimationMethod::kSri ||
+            surface_normal_params_.method ==
+                depth_segmentation::SurfaceNormalEstimationMethod::
+                    kDepthWindowFilter) {
           depth_segmenter_.computeNormalMap(depth_map, &normal_map);
         } else if (surface_normal_params_.method ==
-                   cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD) {
+                   depth_segmentation::SurfaceNormalEstimationMethod::
+                       kLinemod) {
           depth_segmenter_.computeNormalMap(cv_depth_image->image, &normal_map);
         }
 

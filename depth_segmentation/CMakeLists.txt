@@ -5,11 +5,31 @@ add_definitions(-std=c++11)
 
 find_package(catkin_simple REQUIRED)
 
-catkin_simple(ALL_DEPS_REQUIRED)
+if(APPLE)
+  catkin_simple()
+  set(CMAKE_C_COMPILER clang-omp)
+  set(CMAKE_CXX_COMPILER clang-omp++)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+else()
+  catkin_simple(ALL_DEPS_REQUIRED)
+endif()
+
+# OpenMP
+# Adapted from http://wiki.ros.org/catkin/migrating_from_rosbuild
+if(OPENMP_FOUND)
+  message(STATUS "OpenMP found! cxx_flags: ${OpenMP_CXX_FLAGS} libs: ${OpenMP_LIBS}")
+  set(OpenMP_FLAGS ${OpenMP_CXX_FLAGS})
+  set(OpenMP_LIBS gomp)
+  add_definitions(-Wno-unknown-pragmas ${OpenMP_FLAGS})
+endif()
 
 cs_add_library(${PROJECT_NAME}
   src/depth_segmentation.cpp
 )
+target_link_libraries(${PROJECT_NAME} ${OpenMP_LIBS})
+target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_FLAGS})
+
 
 # add_definitions(-DWRITE_IMAGES)
 cs_add_executable(${PROJECT_NAME}_node
@@ -29,7 +49,6 @@ target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
 # UNIT TESTS
 catkin_add_gtest(test_depth_segmentation test/test_depth_segmentation.cpp)
 target_link_libraries(test_depth_segmentation ${PROJECT_NAME} pthread)
-# add_dependencies(test_depth_segmentation test_data)
 
 cs_install()
 cs_export()
