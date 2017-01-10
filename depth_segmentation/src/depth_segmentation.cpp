@@ -170,7 +170,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
     LOG(ERROR) << "Set the normals window size to an odd value of at least 3.";
     return;
   }
-  if (config.normals_method != SurfaceNormalEstimationMethod::kOwn &&
+  if (config.normals_method !=
+          SurfaceNormalEstimationMethod::kDepthWindowFilter &&
       config.normals_window_size >= 8u) {
     LOG(ERROR) << "Only normal method Own supports normal window sizes larger "
                   "than 7.";
