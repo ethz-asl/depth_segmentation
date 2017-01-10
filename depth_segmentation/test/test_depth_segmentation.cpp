@@ -99,7 +99,6 @@ TEST_F(DepthSegmentationTest, testNormals) {
 
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, normals, &viz_3d);
-  // cv::waitKey(1);
 
   for (size_t y = 0u; y < kNormalImageHeight; ++y) {
     for (size_t x = 0u; x < kNormalImageWidth; ++x) {
