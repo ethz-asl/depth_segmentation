@@ -641,22 +641,19 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
       findBlobs(binary_edge_map, &labels);
       // Randomly color the labels
       for (size_t i = 0u; i < labels.size(); ++i) {
-        unsigned char r = 255 * (rand() / (1.0 + RAND_MAX));
-        unsigned char g = 255 * (rand() / (1.0 + RAND_MAX));
-        unsigned char b = 255 * (rand() / (1.0 + RAND_MAX));
-
+        const unsigned char r = 255 * (rand() / (1.0 + RAND_MAX));
+        const unsigned char g = 255 * (rand() / (1.0 + RAND_MAX));
+        const unsigned char b = 255 * (rand() / (1.0 + RAND_MAX));
+        cv::Vec3b color;
+        if (labels[i].size() < params_.label.min_size) {
+          color = cv::Vec3b(0, 0, 0);
+        } else {
+          color = cv::Vec3b(b, g, r);
+        }
         for (size_t j = 0u; j < labels[i].size(); ++j) {
-          int x = labels[i][j].x;
-          int y = labels[i][j].y;
-          if (labels[i].size() < params_.label.min_size) {
-            output.at<cv::Vec3b>(y, x)[0] = 0;
-            output.at<cv::Vec3b>(y, x)[1] = 0;
-            output.at<cv::Vec3b>(y, x)[2] = 0;
-          } else {
-            output.at<cv::Vec3b>(y, x)[0] = b;
-            output.at<cv::Vec3b>(y, x)[1] = g;
-            output.at<cv::Vec3b>(y, x)[2] = r;
-          }
+          const size_t x = labels[i][j].x;
+          const size_t y = labels[i][j].y;
+          output.at<cv::Vec3b>(y, x) = color;
         }
       }
       break;
