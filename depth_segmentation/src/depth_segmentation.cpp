@@ -649,9 +649,9 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
           int x = labels[i][j].x;
           int y = labels[i][j].y;
           if (labels[i].size() < params_.label.min_size) {
-            output.at<cv::Vec3b>(y, x)[0] = 255;
-            output.at<cv::Vec3b>(y, x)[1] = 255;
-            output.at<cv::Vec3b>(y, x)[2] = 255;
+            output.at<cv::Vec3b>(y, x)[0] = 0;
+            output.at<cv::Vec3b>(y, x)[1] = 0;
+            output.at<cv::Vec3b>(y, x)[2] = 0;
           } else {
             output.at<cv::Vec3b>(y, x)[0] = b;
             output.at<cv::Vec3b>(y, x)[1] = g;
