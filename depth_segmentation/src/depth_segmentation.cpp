@@ -595,7 +595,9 @@ void DepthSegmenter::inpaintImage(const cv::Mat& image, cv::Mat* inpainted) {
 }
 
 void DepthSegmenter::labelMap(const cv::Mat& depth_image,
-                              const cv::Mat& edge_map, cv::Mat* labeled_map) {
+                              const cv::Mat& depth_map, const cv::Mat& edge_map,
+                              cv::Mat* labeled_map,
+                              std::vector<std::vector<cv::Vec3f>>* segments) {
   CHECK(!edge_map.empty());
   CHECK_EQ(edge_map.type(), CV_32FC1);
   CHECK_NOTNULL(labeled_map);
@@ -610,12 +612,13 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
       cv::findContours(edge_map_8u, contours, hierarchy, CV_RETR_TREE,
                        CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
       cv::Mat drawing = cv::Mat::zeros(output.size(), CV_8UC3);
-      std::vector<cv::Point> approximate_shape;
       std::vector<cv::Scalar> colors;
+      std::vector<int> labels;
       for (size_t i = 0u; i < contours.size(); i++) {
         colors.push_back(cv::Scalar(255 * (rand() / (1.0 + RAND_MAX)),
                                     255 * (rand() / (1.0 + RAND_MAX)),
                                     255 * (rand() / (1.0 + RAND_MAX))));
+        labels.push_back(i);
       }
       for (size_t i = 0u; i < contours.size(); i++) {
         double area = cv::contourArea(contours[i]);
@@ -623,14 +626,41 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
           if (hierarchy[i][3] == -1) {
             // Assign black color to areas that have no parent contour.
             colors[i] = cv::Scalar(0, 0, 0);
+            labels[i] = -1;
           } else {
             // Assign the color of the parent contour.
             colors[i] = colors[hierarchy[i][3]];
+            labels[i] = labels[hierarchy[i][3]];
           }
         }
       }
-      for (size_t i = 0u; i < contours.size(); i++) {
+
+      cv::Mat output_labels = cv::Mat::zeros(depth_image.size(), CV_32SC1);
+      for (size_t i = 0u; i < contours.size(); ++i) {
         drawContours(output, contours, i, cv::Scalar(colors[i]), CV_FILLED);
+        drawContours(output_labels, contours, i, cv::Scalar(labels[i]),
+                     CV_FILLED);
+      }
+      // Create a set of all the labels.
+      std::set<size_t> labels_set;
+      for (size_t i = 0u; i < labels.size(); ++i) {
+        if (labels[i] >= 0) {
+          labels_set.insert(labels[i]);
+        }
+      }
+
+      segments->resize(*std::max_element(labels.begin(), labels.end()));
+
+      for (size_t x = 0u; x < output_labels.cols; ++x) {
+        for (size_t y = 0u; y < output_labels.rows; ++y) {
+          // Append vectors from depth_map to vectors of segments.
+          if (output_labels.at<int>(y, x) >= 0) {
+            // TODO(ff): assign proper label index. should be within the size of
+            // labels_set.
+            const unsigned char label = output_labels.at<unsigned char>(y, x);
+            (*segments)[label].push_back(depth_map.at<cv::Vec3f>(y, x));
+          }
+        }
       }
       break;
     }

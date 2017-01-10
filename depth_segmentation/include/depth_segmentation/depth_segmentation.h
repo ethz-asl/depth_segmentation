@@ -147,8 +147,9 @@ class DepthSegmenter {
   void computeFinalEdgeMap(const cv::Mat& convexity_map,
                            const cv::Mat& distance_map, cv::Mat* edge_map);
   void edgeMap(const cv::Mat& image, cv::Mat* edge_map);
-  void labelMap(const cv::Mat& depth_map, const cv::Mat& edge_map,
-                cv::Mat* labeled_map);
+  void labelMap(const cv::Mat& depth_image, const cv::Mat& depth_map,
+                const cv::Mat& edge_map, cv::Mat* labeled_map,
+                std::vector<std::vector<cv::Vec3f>>* segments);
   void inpaintImage(const cv::Mat& image, cv::Mat* inpainted);
   void findBlobs(const cv::Mat& binary,
                  std::vector<std::vector<cv::Point2i>>* labels);
