@@ -618,10 +618,6 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
                                     255 * (rand() / (1.0 + RAND_MAX))));
       }
       for (size_t i = 0u; i < contours.size(); i++) {
-        // const double kMaxApproximationDistance = 1.0;
-        // cv::approxPolyDP(contours[i], approximate_shape,
-        //                  kMaxApproximationDistance, true);
-        // double area = cv::contourArea(approximate_shape);
         double area = cv::contourArea(contours[i]);
         if (area < params_.label.min_size) {
           if (hierarchy[i][3] == -1) {
