@@ -151,7 +151,7 @@ void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
 
 void DepthSegmenter::initialize() {
   CHECK(depth_camera_.initialized());
-  CHECK_EQ(params_.normals.window_size % 2, 1);
+  CHECK_EQ(params_.normals.window_size % 2, 1u);
   rgbd_normals_ = cv::rgbd::RgbdNormals(
       depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
       depth_camera_.getCameraMatrix(), params_.normals.window_size,
@@ -258,7 +258,7 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
   CHECK_NOTNULL(max_distance_map);
   CHECK_EQ(max_distance_map->type(), CV_32FC1);
   // Check if window_size is odd.
-  CHECK_EQ(params_.max_distance.window_size % 2, 1);
+  CHECK_EQ(params_.max_distance.window_size % 2, 1u);
 
   max_distance_map->setTo(cv::Scalar(0.0f));
 
@@ -385,7 +385,7 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
   CHECK_EQ(min_convexity_map->type(), CV_32FC1);
   CHECK_EQ(depth_map.size(), min_convexity_map->size());
   // Check if window_size is odd.
-  CHECK_EQ(params_.min_convexity.window_size % 2, 1);
+  CHECK_EQ(params_.min_convexity.window_size % 2, 1u);
   min_convexity_map->setTo(cv::Scalar(10.0f));
 
   const size_t kernel_size = params_.min_convexity.window_size +

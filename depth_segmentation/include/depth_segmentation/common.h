@@ -236,7 +236,7 @@ void computeOwnNormals(const SurfaceNormalParams& params,
   cv::Vec3f mean;
   cv::Vec3f mid_point;
 
-  float float_nan = std::numeric_limits<float>::quiet_NaN();
+  constexpr float float_nan = std::numeric_limits<float>::quiet_NaN();
 #pragma omp parallel for private(neighborhood, eigenvalues, eigenvectors, \
                                  covariance, mean, mid_point)
   for (size_t y = 0u; y < depth_map.rows; ++y) {
