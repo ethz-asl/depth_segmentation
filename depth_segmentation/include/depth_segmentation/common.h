@@ -69,7 +69,16 @@ struct FinalEdgeMapParams {
   bool display = false;
 };
 
+enum LabelMapMethod {
+  kFloodFill = 0,
+  kContour = 1,
+};
+
 struct LabelMapParams {
+  size_t method = 1u;
+  size_t min_size = 1u;
+  bool use_inpaint = false;
+  size_t inpaint_method = 0u;
   bool display = true;
 };
 
