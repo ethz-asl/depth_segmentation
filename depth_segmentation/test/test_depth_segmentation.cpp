@@ -28,7 +28,8 @@ class DepthSegmentationTest : public ::testing::Test {
     depth_camera_.initialize(480u, 640u, CV_32FC1, camera_matrix);
     min_convexity_map_params_.window_size = 3u;
     depth_segmenter_.initialize();
-    surface_normal_params_.method = SurfaceNormalEstimationMethod::kOwn;
+    surface_normal_params_.method =
+        SurfaceNormalEstimationMethod::kDepthWindowFilter;
     surface_normal_params_.window_size = 3u;
   }
   virtual ~DepthSegmentationTest() {}
@@ -161,7 +162,6 @@ TEST_F(DepthSegmentationTest, testNormals2) {
 
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, normals, &viz_3d);
-  // cv::waitKey(1);
 
   EXPECT_EQ(cv::countNonZero(normals != expected_normals), 0);
 }
@@ -236,7 +236,6 @@ TEST_F(DepthSegmentationTest, testConvexity) {
   cv::imshow(kConvexityGTWindowName, expected_convexity);
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, concave_normals, &viz_3d);
-  // cv::waitKey(1);
 
   EXPECT_EQ(cv::countNonZero(expected_convexity != min_convexity_map), 0);
 }

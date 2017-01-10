@@ -170,7 +170,8 @@ class DepthSegmentationNode {
             surface_normal_params_.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kSri ||
             surface_normal_params_.method ==
-                depth_segmentation::SurfaceNormalEstimationMethod::kOwn) {
+                depth_segmentation::SurfaceNormalEstimationMethod::
+                    kDepthWindowFilter) {
           depth_segmenter_.computeNormalMap(depth_map, &normal_map);
         } else if (surface_normal_params_.method ==
                    depth_segmentation::SurfaceNormalEstimationMethod::

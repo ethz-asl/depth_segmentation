@@ -152,7 +152,8 @@ void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
 void DepthSegmenter::initialize() {
   CHECK(depth_camera_.initialized());
   CHECK_EQ(surface_normal_params_.window_size % 2, 1);
-  if (surface_normal_params_.method != SurfaceNormalEstimationMethod::kOwn) {
+  if (surface_normal_params_.method !=
+      SurfaceNormalEstimationMethod::kDepthWindowFilter) {
     rgbd_normals_ = cv::rgbd::RgbdNormals(
         depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
         depth_camera_.getCameraMatrix(), surface_normal_params_.window_size,
@@ -277,13 +278,14 @@ void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
              surface_normal_params_.method ==
                  SurfaceNormalEstimationMethod::kSri ||
              surface_normal_params_.method ==
-                 SurfaceNormalEstimationMethod::kOwn) ||
+                 SurfaceNormalEstimationMethod::kDepthWindowFilter) ||
         (depth_map.type() == CV_32FC1 || depth_map.type() == CV_16UC1 ||
          depth_map.type() == CV_32FC3) &&
             surface_normal_params_.method ==
                 SurfaceNormalEstimationMethod::kLinemod);
   CHECK_NOTNULL(normal_map);
-  if (surface_normal_params_.method != SurfaceNormalEstimationMethod::kOwn) {
+  if (surface_normal_params_.method !=
+      SurfaceNormalEstimationMethod::kDepthWindowFilter) {
     rgbd_normals_(depth_map, *normal_map);
   } else {
     computeOwnNormals(surface_normal_params_, depth_map, normal_map);
