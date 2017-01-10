@@ -16,19 +16,19 @@ enum SurfaceNormalEstimationMethod {
   kFals = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS,
   kLinemod = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD,
   kSri = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI,
-  kOwn = 3,
+  kDepthWindowFilter = 3,
 };
 
 struct SurfaceNormalParams {
   SurfaceNormalParams() {
     CHECK_EQ(window_size % 2u, 1u);
     CHECK_GT(window_size, 1u);
-    if (method != SurfaceNormalEstimationMethod::kOwn) {
+    if (method != SurfaceNormalEstimationMethod::kDepthWindowFilter) {
       CHECK_LT(window_size, 8u);
     }
   }
   size_t window_size = 11u;
-  size_t method = SurfaceNormalEstimationMethod::kOwn;
+  size_t method = SurfaceNormalEstimationMethod::kDepthWindowFilter;
   bool display = false;
   double distance_factor_threshold = 0.01;
 };
@@ -139,25 +139,27 @@ void visualizeDepthMapWithNormals(const cv::Mat& depth_map,
 void computeCovariance(const cv::Mat& neighborhood, const cv::Vec3f& mean,
                        const size_t neighborhood_size, cv::Mat* covariance) {
   CHECK(!neighborhood.empty());
+  CHECK_EQ(neighborhood.rows, 3u);
   CHECK_GT(neighborhood_size, 0u);
+  CHECK_LE(neighborhood_size, neighborhood.cols);
   CHECK_NOTNULL(covariance);
 
   *covariance = cv::Mat::zeros(3, 3, CV_32F);
 
   for (size_t i = 0u; i < neighborhood_size; ++i) {
     cv::Vec3f point;
-    point[0] = neighborhood.at<float>(0, i) - mean[0];
-    point[1] = neighborhood.at<float>(1, i) - mean[1];
-    point[2] = neighborhood.at<float>(2, i) - mean[2];
+    for (size_t row = 0u; row < neighborhood.rows; ++row) {
+      point[row] = neighborhood.at<float>(row, i) - mean[row];
+    }
 
     covariance->at<float>(1, 1) += point[1] * point[1];
     covariance->at<float>(1, 2) += point[1] * point[2];
     covariance->at<float>(2, 2) += point[2] * point[2];
 
     point *= point[0];
-    covariance->at<float>(0, 0) += point[0];
-    covariance->at<float>(0, 1) += point[1];
-    covariance->at<float>(0, 2) += point[2];
+    for (size_t row = 0u; row < neighborhood.rows; ++row) {
+      covariance->at<float>(0, row) += point[row];
+    }
   }
   // Assign the symmetric elements of the covariance matrix.
   covariance->at<float>(1, 0) = covariance->at<float>(0, 1);
@@ -184,29 +186,29 @@ size_t findNeighborhood(const cv::Mat& depth_map, const size_t window_size,
   *neighborhood = cv::Mat::zeros(3, window_size * window_size, CV_32FC1);
   cv::Vec3f mid_point = depth_map.at<cv::Vec3f>(y, x);
   for (size_t y_idx = 0u; y_idx < window_size; ++y_idx) {
-    int y_filter_idx = y + y_idx - window_size / 2u;
+    const int y_filter_idx = y + y_idx - window_size / 2u;
     if (y_filter_idx < 0 || y_filter_idx >= depth_map.rows) {
       continue;
     }
+    CHECK_GE(y_filter_idx, 0u);
+    CHECK_LT(y_filter_idx, depth_map.rows);
     for (size_t x_idx = 0u; x_idx < window_size; ++x_idx) {
-      int x_filter_idx = x + x_idx - window_size / 2u;
+      const int x_filter_idx = x + x_idx - window_size / 2u;
       if (x_filter_idx < 0 || x_filter_idx >= depth_map.cols) {
         continue;
       }
-      CHECK_GE(y_filter_idx, 0u);
       CHECK_GE(x_filter_idx, 0u);
-      CHECK_LT(y_filter_idx, depth_map.rows);
       CHECK_LT(x_filter_idx, depth_map.cols);
 
       cv::Vec3f filter_point =
           depth_map.at<cv::Vec3f>(y_filter_idx, x_filter_idx);
 
       // Compute Euclidean distance between filter_point and mid_point.
-      cv::Vec3f difference = mid_point - filter_point;
-      float euclidean_dist = cv::sqrt(difference.dot(difference));
+      const cv::Vec3f difference = mid_point - filter_point;
+      const float euclidean_dist = cv::sqrt(difference.dot(difference));
       if (euclidean_dist < max_distance) {
         // Add the filter_point to neighborhood set.
-        for (size_t coordinate = 0; coordinate < 3; ++coordinate) {
+        for (size_t coordinate = 0u; coordinate < 3u; ++coordinate) {
           neighborhood->at<float>(coordinate, neighborhood_size) =
               filter_point[coordinate];
         }
@@ -215,16 +217,18 @@ size_t findNeighborhood(const cv::Mat& depth_map, const size_t window_size,
       }
     }
   }
+  CHECK_GE(neighborhood_size, 1u);
+  CHECK_LE(neighborhood_size, window_size * window_size);
   *mean /= static_cast<float>(neighborhood_size);
   return neighborhood_size;
 }
 
-/*! \brief Compute point normals of a depth image.
- *
- * Compute the point normals by looking at a neighborhood around each pixel.
- * We're taking a standard squared kernel, where we discard points that are too
- * far away from the center point (by evaluating the Euclidean distance).
- */
+// \brief Compute point normals of a depth image.
+//
+// Compute the point normals by looking at a neighborhood around each pixel.
+// We're taking a standard squared kernel, where we discard points that are too
+// far away from the center point (by evaluating the Euclidean distance).
+//
 void computeOwnNormals(const SurfaceNormalParams& params,
                        const cv::Mat& depth_map, cv::Mat* normals) {
   CHECK(!depth_map.empty());
@@ -241,7 +245,7 @@ void computeOwnNormals(const SurfaceNormalParams& params,
   cv::Vec3f mean;
   cv::Vec3f mid_point;
 
-  float float_nan = std::numeric_limits<float>::quiet_NaN();
+  constexpr float float_nan = std::numeric_limits<float>::quiet_NaN();
 #pragma omp parallel for private(neighborhood, eigenvalues, eigenvectors, \
                                  covariance, mean, mid_point)
   for (size_t y = 0u; y < depth_map.rows; ++y) {
@@ -251,12 +255,11 @@ void computeOwnNormals(const SurfaceNormalParams& params,
       if (cvIsNaN(mid_point[2])) {
         continue;
       }
-      float max_distance = params.distance_factor_threshold * mid_point[2];
-      mean[0] = 0.0f;
-      mean[1] = 0.0f;
-      mean[2] = 0.0f;
+      const float max_distance =
+          params.distance_factor_threshold * mid_point[2];
+      mean = cv::Vec3f(0.0f, 0.0f, 0.0f);
 
-      size_t neighborhood_size =
+      const size_t neighborhood_size =
           findNeighborhood(depth_map, params.window_size, max_distance, x, y,
                            &neighborhood, &mean);
       if (neighborhood_size > 1u) {
@@ -264,12 +267,12 @@ void computeOwnNormals(const SurfaceNormalParams& params,
         // Compute Eigen vectors.
         cv::eigen(covariance, eigenvalues, eigenvectors);
         // Get the Eigenvector corresponding to the smallest Eigenvalue.
-        const size_t n_th_eigenvector = 2u;
+        constexpr size_t n_th_eigenvector = 2u;
         for (size_t coordinate = 0u; coordinate < 3u; ++coordinate) {
           normals->at<cv::Vec3f>(y, x)[coordinate] =
               eigenvectors.at<float>(n_th_eigenvector, coordinate);
         }
-        // Re-Orient normals to point towards camera
+        // Re-Orient normals to point towards camera.
         if (normals->at<cv::Vec3f>(y, x)[2] > 0.0f) {
           normals->at<cv::Vec3f>(y, x) = -normals->at<cv::Vec3f>(y, x);
         }
