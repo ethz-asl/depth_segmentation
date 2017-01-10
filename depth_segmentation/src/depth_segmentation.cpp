@@ -350,12 +350,14 @@ void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
   CHECK(depth_map.type() == CV_32FC3 &&
             (params_.normals.method == SurfaceNormalEstimationMethod::kFals ||
              params_.normals.method == SurfaceNormalEstimationMethod::kSri ||
-             params_.normals.method == SurfaceNormalEstimationMethod::kOwn) ||
+             params_.normals.method ==
+                 SurfaceNormalEstimationMethod::kDepthWindowFilter) ||
         (depth_map.type() == CV_32FC1 || depth_map.type() == CV_16UC1 ||
          depth_map.type() == CV_32FC3) &&
             params_.normals.method == SurfaceNormalEstimationMethod::kLinemod);
   CHECK_NOTNULL(normal_map);
-  if (params_.normals.method != SurfaceNormalEstimationMethod::kOwn) {
+  if (params_.normals.method !=
+      SurfaceNormalEstimationMethod::kDepthWindowFilter) {
     rgbd_normals_(depth_map, *normal_map);
   } else {
     computeOwnNormals(params_.normals, depth_map, normal_map);
