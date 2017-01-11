@@ -266,9 +266,8 @@ void computeOwnNormals(const SurfaceNormalParams& params,
           normals->at<cv::Vec3f>(y, x) = -normals->at<cv::Vec3f>(y, x);
         }
       } else {
-        for (size_t coordinate = 0u; coordinate < 3u; ++coordinate) {
-          normals->at<cv::Vec3f>(y, x)[coordinate] = float_nan;
-        }
+        normals->at<cv::Vec3f>(y, x) =
+            cv::Vec3f(float_nan, float_nan, float_nan);
       }
     }
   }
