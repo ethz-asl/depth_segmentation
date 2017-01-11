@@ -152,6 +152,14 @@ void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
 void DepthSegmenter::initialize() {
   CHECK(depth_camera_.initialized());
   CHECK_EQ(params_.normals.window_size % 2, 1u);
+  CHECK_GT(params_.normals.window_size, 1u);
+  if (params_.normals.method !=
+      SurfaceNormalEstimationMethod::kDepthWindowFilter) {
+    CHECK_LT(params_.normals.window_size, 8u);
+  }
+  CHECK_EQ(params_.max_distance.window_size % 2u, 1u);
+  CHECK_EQ(params_.min_convexity.window_size % 2u, 1u);
+
   rgbd_normals_ = cv::rgbd::RgbdNormals(
       depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
       depth_camera_.getCameraMatrix(), params_.normals.window_size,
