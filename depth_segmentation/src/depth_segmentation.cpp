@@ -437,11 +437,12 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
 
     // Split the projected vector images into convex and concave
     // regions/masks.
+    constexpr float kMaxBinaryValue = 1.0f;
     cv::threshold(vector_projection, convexity_mask,
-                  params_.min_convexity.mask_threshold, 1.0f,
+                  params_.min_convexity.mask_threshold, kMaxBinaryValue,
                   cv::THRESH_BINARY);
     cv::threshold(vector_projection, concavity_mask,
-                  params_.min_convexity.mask_threshold, 1.0f,
+                  params_.min_convexity.mask_threshold, kMaxBinaryValue,
                   cv::THRESH_BINARY_INV);
 
     cv::Mat normal_kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32FC1);
@@ -468,8 +469,10 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
   }
 
   if (params_.min_convexity.use_threshold) {
+    constexpr float kMaxBinaryValue = 1.0f;
     cv::threshold(*min_convexity_map, *min_convexity_map,
-                  params_.min_convexity.threshold, 1.0f, cv::THRESH_BINARY);
+                  params_.min_convexity.threshold, kMaxBinaryValue,
+                  cv::THRESH_BINARY);
   }
 
   if (params_.min_convexity.use_morphological_opening) {
@@ -595,7 +598,10 @@ void DepthSegmenter::labelMap(const cv::Mat& edge_map, cv::Mat* labeled_map) {
   cv::Mat binary_edge_map;
 
   std::vector<std::vector<cv::Point2i>> labels;
-  cv::threshold(edge_map, binary_edge_map, 0.0, 1.0, cv::THRESH_BINARY);
+  constexpr float kEdgeMapThresholdValue = 0.0f;
+  constexpr float kMaxBinaryValue = 1.0f;
+  cv::threshold(edge_map, binary_edge_map, kEdgeMapThresholdValue,
+                kMaxBinaryValue, cv::THRESH_BINARY);
   findBlobs(binary_edge_map, &labels);
   cv::Mat output = cv::Mat::zeros(binary_edge_map.size(), CV_8UC3);
 
