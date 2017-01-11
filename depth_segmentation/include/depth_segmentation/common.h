@@ -43,9 +43,9 @@ struct MaxDistanceMapParams {
                                         // it.
   bool use_threshold = true;
   double noise_thresholding_factor = 6.0;
-  double sensor_noise_param_1 = 0.0012;  // From Nguyen et al. (2012)
-  double sensor_noise_param_2 = 0.0019;  // From Nguyen et al. (2012)
-  double sensor_noise_param_3 = 0.0001;  // From Nguyen et al. (2012)
+  double sensor_noise_param_1st_order = 0.0012;  // From Nguyen et al. (2012)
+  double sensor_noise_param_2nd_order = 0.0019;  // From Nguyen et al. (2012)
+  double sensor_noise_param_3rd_order = 0.0001;  // From Nguyen et al. (2012)
   double sensor_min_distance = 0.2;
 };
 
@@ -57,7 +57,8 @@ struct MinConvexityMapParams {
   bool display = false;
   bool use_morphological_opening = true;
   bool use_threshold = true;
-  double min_convexity_threshold = 0.95;
+  double threshold = 0.95;
+  double mask_threshold = -0.0005;
 };
 
 struct FinalEdgeMapParams {
@@ -84,6 +85,14 @@ struct IsNotNan {
   bool operator()(T const& p) const {
     return !std::isnan(p);
   }
+};
+
+struct Params {
+  FinalEdgeMapParams final_edge;
+  LabelMapParams label;
+  MaxDistanceMapParams max_distance;
+  MinConvexityMapParams min_convexity;
+  SurfaceNormalParams normals;
 };
 
 void visualizeDepthMap(const cv::Mat& depth_map, cv::viz::Viz3d* viz_3d) {
@@ -225,6 +234,7 @@ void computeOwnNormals(const SurfaceNormalParams& params,
   cv::Vec3f mean;
   cv::Vec3f mid_point;
 
+  constexpr float float_nan = std::numeric_limits<float>::quiet_NaN();
 #pragma omp parallel for private(neighborhood, eigenvalues, eigenvectors, \
                                  covariance, mean, mid_point)
   for (size_t y = 0u; y < depth_map.rows; ++y) {
@@ -256,7 +266,8 @@ void computeOwnNormals(const SurfaceNormalParams& params,
           normals->at<cv::Vec3f>(y, x) = -normals->at<cv::Vec3f>(y, x);
         }
       } else {
-        // TODO(ff): Set normal to nan?
+        normals->at<cv::Vec3f>(y, x) =
+            cv::Vec3f(float_nan, float_nan, float_nan);
       }
     }
   }

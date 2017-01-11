@@ -1,4 +1,5 @@
 #include <cv_bridge/cv_bridge.h>
+#include <dynamic_reconfigure/server.h>
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber.h>
 #include <image_transport/subscriber_filter.h>
@@ -35,15 +36,9 @@ class DepthSegmentationNode {
                                  rgb_info_sub_),
         depth_camera_(),
         rgb_camera_(),
-        surface_normal_params_(),
-        max_distance_map_params_(),
-        min_convexity_map_params_(),
-        final_edge_map_params_(),
-        label_map_params_(),
+        params_(),
         camera_tracker_(depth_camera_, rgb_camera_),
-        depth_segmenter_(depth_camera_, surface_normal_params_,
-                         max_distance_map_params_, min_convexity_map_params_,
-                         final_edge_map_params_, label_map_params_) {
+        depth_segmenter_(depth_camera_, params_) {
     image_sync_policy_.registerCallback(
         boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
     camera_info_sync_policy_.registerCallback(
@@ -66,15 +61,13 @@ class DepthSegmentationNode {
   depth_segmentation::DepthCamera depth_camera_;
   depth_segmentation::RgbCamera rgb_camera_;
 
-  depth_segmentation::SurfaceNormalParams surface_normal_params_;
-  depth_segmentation::MaxDistanceMapParams max_distance_map_params_;
-  depth_segmentation::MinConvexityMapParams min_convexity_map_params_;
-  depth_segmentation::FinalEdgeMapParams final_edge_map_params_;
-  depth_segmentation::LabelMapParams label_map_params_;
+  depth_segmentation::Params params_;
 
+ public:
   depth_segmentation::CameraTracker camera_tracker_;
   depth_segmentation::DepthSegmenter depth_segmenter_;
 
+ private:
   message_filters::Subscriber<sensor_msgs::CameraInfo> depth_info_sub_;
   message_filters::Subscriber<sensor_msgs::CameraInfo> rgb_info_sub_;
 
@@ -165,15 +158,15 @@ class DepthSegmentationNode {
 
         // Compute normal map.
         cv::Mat normal_map(depth_map.size(), CV_32FC3);
-        if (surface_normal_params_.method ==
+        if (params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
-            surface_normal_params_.method ==
+            params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kSri ||
-            surface_normal_params_.method ==
+            params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::
                     kDepthWindowFilter) {
           depth_segmenter_.computeNormalMap(depth_map, &normal_map);
-        } else if (surface_normal_params_.method ==
+        } else if (params_.normals.method ==
                    depth_segmentation::SurfaceNormalEstimationMethod::
                        kLinemod) {
           depth_segmenter_.computeNormalMap(cv_depth_image->image, &normal_map);
@@ -259,6 +252,16 @@ int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   ros::init(argc, argv, "depth_segmentation_node");
   DepthSegmentationNode depth_segmentation_node;
+
+  dynamic_reconfigure::Server<depth_segmentation::DepthSegmenterConfig>
+      reconfigure_server;
+  dynamic_reconfigure::Server<depth_segmentation::DepthSegmenterConfig>::
+      CallbackType dynamic_reconfigure_function;
+
+  dynamic_reconfigure_function = boost::bind(
+      &depth_segmentation::DepthSegmenter::dynamicReconfigureCallback,
+      &depth_segmentation_node.depth_segmenter_, _1, _2);
+  reconfigure_server.setCallback(dynamic_reconfigure_function);
 
   while (ros::ok()) {
     ros::spin();

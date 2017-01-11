@@ -5,6 +5,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/rgbd.hpp>
 
+#include "depth_segmentation/DepthSegmenterConfig.h"
 #include "depth_segmentation/common.h"
 
 namespace depth_segmentation {
@@ -129,22 +130,14 @@ class CameraTracker {
 
 class DepthSegmenter {
  public:
-  DepthSegmenter(const DepthCamera& depth_camera,
-                 const SurfaceNormalParams& surface_normal_params,
-                 const MaxDistanceMapParams& max_distance_map_params,
-                 const MinConvexityMapParams& min_convexity_map_params,
-                 const FinalEdgeMapParams& final_edge_map_params,
-                 const LabelMapParams& label_map_params)
-      : depth_camera_(depth_camera),
-        surface_normal_params_(surface_normal_params),
-        max_distance_map_params_(max_distance_map_params),
-        min_convexity_map_params_(min_convexity_map_params),
-        final_edge_map_params_(final_edge_map_params),
-        label_map_params_(label_map_params) {
-    CHECK_EQ(surface_normal_params.window_size % 2u, 1u);
-    CHECK_EQ(max_distance_map_params_.window_size % 2u, 1u);
+  DepthSegmenter(const DepthCamera& depth_camera, Params& params)
+      : depth_camera_(depth_camera), params_(params) {
+    CHECK_EQ(params_.normals.window_size % 2u, 1u);
+    CHECK_EQ(params_.max_distance.window_size % 2u, 1u);
   };
   void initialize();
+  void dynamicReconfigureCallback(
+      depth_segmentation::DepthSegmenterConfig& config, uint32_t level);
   void computeDepthMap(const cv::Mat& depth_image, cv::Mat* depth_map);
   void computeMaxDistanceMap(const cv::Mat& image, cv::Mat* max_distance_map);
   void computeNormalMap(const cv::Mat& depth_map, cv::Mat* normal_map);
@@ -163,11 +156,7 @@ class DepthSegmenter {
  private:
   const DepthCamera& depth_camera_;
 
-  const SurfaceNormalParams& surface_normal_params_;
-  const MaxDistanceMapParams& max_distance_map_params_;
-  const MinConvexityMapParams& min_convexity_map_params_;
-  const FinalEdgeMapParams& final_edge_map_params_;
-  const LabelMapParams& label_map_params_;
+  Params& params_;
 
   cv::rgbd::RgbdNormals rgbd_normals_;
 };
