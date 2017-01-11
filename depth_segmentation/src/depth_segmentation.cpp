@@ -153,6 +153,14 @@ void CameraTracker::dilateFrame(cv::Mat& image, cv::Mat& depth) {
 void DepthSegmenter::initialize() {
   CHECK(depth_camera_.initialized());
   CHECK_EQ(params_.normals.window_size % 2, 1u);
+  CHECK_GT(params_.normals.window_size, 1u);
+  if (params_.normals.method !=
+      SurfaceNormalEstimationMethod::kDepthWindowFilter) {
+    CHECK_LT(params_.normals.window_size, 8u);
+  }
+  CHECK_EQ(params_.max_distance.window_size % 2u, 1u);
+  CHECK_EQ(params_.min_convexity.window_size % 2u, 1u);
+
   rgbd_normals_ = cv::rgbd::RgbdNormals(
       depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
       depth_camera_.getCameraMatrix(), params_.normals.window_size,
@@ -164,16 +172,22 @@ void DepthSegmenter::dynamicReconfigureCallback(
     depth_segmentation::DepthSegmenterConfig& config, uint32_t level) {
   // Surface normal params.
   if (config.normals_window_size % 2u != 1u) {
+    // Resetting the config value to its previous value.
+    config.normals_window_size = params_.normals.window_size;
     LOG(ERROR) << "Set the normals window size to an odd number.";
     return;
   }
   if (config.normals_window_size < 1u) {
+    // Resetting the config value to its previous value.
+    config.normals_window_size = params_.normals.window_size;
     LOG(ERROR) << "Set the normals window size to an odd value of at least 3.";
     return;
   }
   if (config.normals_method !=
           SurfaceNormalEstimationMethod::kDepthWindowFilter &&
       config.normals_window_size >= 8u) {
+    // Resetting the config value to its previous value.
+    config.normals_window_size = params_.normals.window_size;
     LOG(ERROR) << "Only normal method Own supports normal window sizes larger "
                   "than 7.";
     return;
@@ -186,6 +200,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
 
   // Max distance map params.
   if (config.max_distance_window_size % 2u != 1u) {
+    // Resetting the config value to its previous value.
+    config.max_distance_window_size = params_.max_distance.window_size;
     LOG(ERROR) << "Set the max distnace window size to an odd number.";
     return;
   }
@@ -198,17 +214,19 @@ void DepthSegmenter::dynamicReconfigureCallback(
       config.max_distance_noise_thresholding_factor;
   params_.max_distance.sensor_min_distance =
       config.max_distance_sensor_min_distance;
-  params_.max_distance.sensor_noise_param_1 =
-      config.max_distance_sensor_noise_param_1;
-  params_.max_distance.sensor_noise_param_2 =
-      config.max_distance_sensor_noise_param_2;
-  params_.max_distance.sensor_noise_param_3 =
-      config.max_distance_sensor_noise_param_3;
+  params_.max_distance.sensor_noise_param_1st_order =
+      config.max_distance_sensor_noise_param_1st_order;
+  params_.max_distance.sensor_noise_param_2nd_order =
+      config.max_distance_sensor_noise_param_2nd_order;
+  params_.max_distance.sensor_noise_param_3rd_order =
+      config.max_distance_sensor_noise_param_3rd_order;
   params_.max_distance.use_threshold = config.max_distance_use_threshold;
   params_.max_distance.window_size = config.max_distance_window_size;
 
   // Min convexity map params.
   if (config.min_convexity_window_size % 2u != 1u) {
+    // Resetting the config value to its previous value.
+    config.min_convexity_window_size = params_.min_convexity.window_size;
     LOG(ERROR) << "Set the min convexity window size to an odd number.";
     return;
   }
@@ -329,12 +347,12 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
       static constexpr float theta = 30.f * CV_PI / 180.f;
       float z = (channels[2]).at<float>(i);
       float sigma_axial_noise =
-          params_.max_distance.sensor_noise_param_1 +
-          params_.max_distance.sensor_noise_param_2 *
+          params_.max_distance.sensor_noise_param_1st_order +
+          params_.max_distance.sensor_noise_param_2nd_order *
               (z - params_.max_distance.sensor_min_distance) *
               (z - params_.max_distance.sensor_min_distance) +
-          params_.max_distance.sensor_noise_param_3 / cv::sqrt(z) * theta *
-              theta / (CV_PI / 2.0f - theta) * (CV_PI / 2.0f - theta);
+          params_.max_distance.sensor_noise_param_3rd_order / cv::sqrt(z) *
+              theta * theta / (CV_PI / 2.0f - theta) * (CV_PI / 2.0f - theta);
       if (max_distance_map->at<float>(i) >
           sigma_axial_noise * params_.max_distance.noise_thresholding_factor) {
         max_distance_map->at<float>(i) = 1.0f;
@@ -443,11 +461,12 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
 
     // Split the projected vector images into convex and concave
     // regions/masks.
+    constexpr float kMaxBinaryValue = 1.0f;
     cv::threshold(vector_projection, convexity_mask,
-                  params_.min_convexity.mask_threshold, 1.0f,
+                  params_.min_convexity.mask_threshold, kMaxBinaryValue,
                   cv::THRESH_BINARY);
     cv::threshold(vector_projection, concavity_mask,
-                  params_.min_convexity.mask_threshold, 1.0f,
+                  params_.min_convexity.mask_threshold, kMaxBinaryValue,
                   cv::THRESH_BINARY_INV);
 
     cv::Mat normal_kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32FC1);
@@ -474,8 +493,10 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
   }
 
   if (params_.min_convexity.use_threshold) {
+    constexpr float kMaxBinaryValue = 1.0f;
     cv::threshold(*min_convexity_map, *min_convexity_map,
-                  params_.min_convexity.threshold, 1.0f, cv::THRESH_BINARY);
+                  params_.min_convexity.threshold, kMaxBinaryValue,
+                  cv::THRESH_BINARY);
   }
 
   if (params_.min_convexity.use_morphological_opening) {
@@ -636,7 +657,10 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
     }
     case LabelMapMethod::kFloodFill: {
       cv::Mat binary_edge_map;
-      cv::threshold(edge_map, binary_edge_map, 0.0, 1.0, cv::THRESH_BINARY);
+      constexpr float kEdgeMapThresholdValue = 0.0f;
+      constexpr float kMaxBinaryValue = 1.0f;
+      cv::threshold(edge_map, binary_edge_map, kEdgeMapThresholdValue,
+                    kMaxBinaryValue, cv::THRESH_BINARY);
       std::vector<std::vector<cv::Point2i>> labels;
       findBlobs(binary_edge_map, &labels);
       // Randomly color the labels
