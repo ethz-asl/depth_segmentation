@@ -88,8 +88,6 @@ struct IsNotNan {
 };
 
 struct Params {
-  Params()
-      : final_edge(), label(), max_distance(), min_convexity(), normals() {}
   FinalEdgeMapParams final_edge;
   LabelMapParams label;
   MaxDistanceMapParams max_distance;
