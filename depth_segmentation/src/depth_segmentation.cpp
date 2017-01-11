@@ -662,24 +662,27 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
         drawContours(output_labels, contours, i, cv::Scalar(labels[i]),
                      CV_FILLED);
       }
-      // Create a set of all the labels.
-      std::set<size_t> labels_set;
+      // Create a map of all the labels.
+      std::map<size_t, size_t> labels_map;
+      size_t value = 0u;
       for (size_t i = 0u; i < labels.size(); ++i) {
         if (labels[i] >= 0) {
-          labels_set.insert(labels[i]);
+          // Create a new map if label is not yet in keys.
+          if (labels_map.find(labels[i]) == labels_map.end()) {
+            labels_map[labels[i]] = value;
+            ++value;
+          }
         }
       }
-
-      segments->resize(*std::max_element(labels.begin(), labels.end()));
+      segments->resize(labels_map.size());
 
       for (size_t x = 0u; x < output_labels.cols; ++x) {
         for (size_t y = 0u; y < output_labels.rows; ++y) {
+          const int32_t label = output_labels.at<int32_t>(y, x);
           // Append vectors from depth_map to vectors of segments.
-          if (output_labels.at<int>(y, x) >= 0) {
-            // TODO(ff): assign proper label index. should be within the size of
-            // labels_set.
-            const unsigned char label = output_labels.at<unsigned char>(y, x);
-            (*segments)[label].push_back(depth_map.at<cv::Vec3f>(y, x));
+          if (labels_map.find(label) != labels_map.end()) {
+            (*segments)[labels_map.at(label)].push_back(
+                depth_map.at<cv::Vec3f>(y, x));
           }
         }
       }

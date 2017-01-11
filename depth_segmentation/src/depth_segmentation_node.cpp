@@ -50,8 +50,11 @@ class DepthSegmentationNode {
         boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
     camera_info_sync_policy_.registerCallback(
         boost::bind(&DepthSegmentationNode::cameraInfoCallback, this, _1, _2));
-    point_cloud2_pub_ = node_handle_.advertise<sensor_msgs::PointCloud2>(
-        "object_segment", 1000);
+    point_cloud2_segment_pub_ =
+        node_handle_.advertise<sensor_msgs::PointCloud2>("object_segment",
+                                                         1000);
+    point_cloud2_scene_pub_ =
+        node_handle_.advertise<sensor_msgs::PointCloud2>("segmented_scene", 1);
   }
 
  private:
@@ -83,7 +86,8 @@ class DepthSegmentationNode {
   image_transport::SubscriberFilter depth_image_sub_;
   image_transport::SubscriberFilter rgb_image_sub_;
 
-  ros::Publisher point_cloud2_pub_;
+  ros::Publisher point_cloud2_segment_pub_;
+  ros::Publisher point_cloud2_scene_pub_;
 
   message_filters::Synchronizer<ImageSyncPolicy> image_sync_policy_;
   message_filters::Synchronizer<CameraInfoSyncPolicy> camera_info_sync_policy_;
@@ -116,9 +120,10 @@ class DepthSegmentationNode {
   }
 
   void publish_segments(const std::vector<std::vector<cv::Vec3f>>& segments) {
-    LOG(ERROR) << segments.size();
+    // TODO(ff): use the timestamp of the depth image instead.
+    ros::Time ros_now = ros::Time::now();
+    pcl::PointCloud<PointType>::Ptr scene_pcl(new pcl::PointCloud<PointType>);
     for (std::vector<cv::Vec3f> segment : segments) {
-      LOG(ERROR) << segment.size();
       pcl::PointCloud<PointType>::Ptr segment_pcl(
           new pcl::PointCloud<PointType>);
       const unsigned char r = rand() % 255;
@@ -129,19 +134,26 @@ class DepthSegmentationNode {
         point_pcl.x = point[0];
         point_pcl.y = point[1];
         point_pcl.z = point[2];
-        // TODO(ff): Also propagate label?
         point_pcl.r = r;
         point_pcl.g = g;
         point_pcl.b = b;
         segment_pcl->push_back(point_pcl);
+        scene_pcl->push_back(point_pcl);
       }
       sensor_msgs::PointCloud2 pcl2_msg;
       pcl::toROSMsg(*segment_pcl, pcl2_msg);
-      ros::Time ros_now = ros::Time::now();
       pcl2_msg.header.stamp = ros_now;
       pcl2_msg.header.frame_id = "camera_depth_optical_frame";
-      point_cloud2_pub_.publish(pcl2_msg);
+      point_cloud2_segment_pub_.publish(pcl2_msg);
     }
+    // Just for rviz also publish the whole scene, as otherwise only ~10
+    // segments are shown:
+    // https://github.com/ros-visualization/rviz/issues/689
+    sensor_msgs::PointCloud2 pcl2_msg;
+    pcl::toROSMsg(*scene_pcl, pcl2_msg);
+    pcl2_msg.header.stamp = ros_now;
+    pcl2_msg.header.frame_id = "camera_depth_optical_frame";
+    point_cloud2_scene_pub_.publish(pcl2_msg);
   }
 
   void imageCallback(const sensor_msgs::Image::ConstPtr& depth_msg,
