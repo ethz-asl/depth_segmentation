@@ -163,16 +163,22 @@ void DepthSegmenter::dynamicReconfigureCallback(
     depth_segmentation::DepthSegmenterConfig& config, uint32_t level) {
   // Surface normal params.
   if (config.normals_window_size % 2u != 1u) {
+    // Resetting the config value to its previous value.
+    config.normals_window_size = params_.normals.window_size;
     LOG(ERROR) << "Set the normals window size to an odd number.";
     return;
   }
   if (config.normals_window_size < 1u) {
+    // Resetting the config value to its previous value.
+    config.normals_window_size = params_.normals.window_size;
     LOG(ERROR) << "Set the normals window size to an odd value of at least 3.";
     return;
   }
   if (config.normals_method !=
           SurfaceNormalEstimationMethod::kDepthWindowFilter &&
       config.normals_window_size >= 8u) {
+    // Resetting the config value to its previous value.
+    config.normals_window_size = params_.normals.window_size;
     LOG(ERROR) << "Only normal method Own supports normal window sizes larger "
                   "than 7.";
     return;
@@ -185,6 +191,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
 
   // Max distance map params.
   if (config.max_distance_window_size % 2u != 1u) {
+    // Resetting the config value to its previous value.
+    config.max_distance_window_size = params_.max_distance.window_size;
     LOG(ERROR) << "Set the max distnace window size to an odd number.";
     return;
   }
@@ -208,6 +216,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
 
   // Min convexity map params.
   if (config.min_convexity_window_size % 2u != 1u) {
+    // Resetting the config value to its previous value.
+    config.min_convexity_window_size = params_.min_convexity.window_size;
     LOG(ERROR) << "Set the min convexity window size to an odd number.";
     return;
   }
