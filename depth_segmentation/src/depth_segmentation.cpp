@@ -213,12 +213,12 @@ void DepthSegmenter::dynamicReconfigureCallback(
       config.max_distance_noise_thresholding_factor;
   params_.max_distance.sensor_min_distance =
       config.max_distance_sensor_min_distance;
-  params_.max_distance.sensor_noise_param_1 =
-      config.max_distance_sensor_noise_param_1;
-  params_.max_distance.sensor_noise_param_2 =
-      config.max_distance_sensor_noise_param_2;
-  params_.max_distance.sensor_noise_param_3 =
-      config.max_distance_sensor_noise_param_3;
+  params_.max_distance.sensor_noise_param_1st_order =
+      config.max_distance_sensor_noise_param_1st_order;
+  params_.max_distance.sensor_noise_param_2nd_order =
+      config.max_distance_sensor_noise_param_2nd_order;
+  params_.max_distance.sensor_noise_param_3rd_order =
+      config.max_distance_sensor_noise_param_3rd_order;
   params_.max_distance.use_threshold = config.max_distance_use_threshold;
   params_.max_distance.window_size = config.max_distance_window_size;
 
@@ -341,12 +341,12 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
       static constexpr float theta = 30.f * CV_PI / 180.f;
       float z = (channels[2]).at<float>(i);
       float sigma_axial_noise =
-          params_.max_distance.sensor_noise_param_1 +
-          params_.max_distance.sensor_noise_param_2 *
+          params_.max_distance.sensor_noise_param_1st_order +
+          params_.max_distance.sensor_noise_param_2nd_order *
               (z - params_.max_distance.sensor_min_distance) *
               (z - params_.max_distance.sensor_min_distance) +
-          params_.max_distance.sensor_noise_param_3 / cv::sqrt(z) * theta *
-              theta / (CV_PI / 2.0f - theta) * (CV_PI / 2.0f - theta);
+          params_.max_distance.sensor_noise_param_3rd_order / cv::sqrt(z) *
+              theta * theta / (CV_PI / 2.0f - theta) * (CV_PI / 2.0f - theta);
       if (max_distance_map->at<float>(i) >
           sigma_axial_noise * params_.max_distance.noise_thresholding_factor) {
         max_distance_map->at<float>(i) = 1.0f;

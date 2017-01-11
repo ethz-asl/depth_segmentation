@@ -43,9 +43,9 @@ struct MaxDistanceMapParams {
                                         // it.
   bool use_threshold = true;
   double noise_thresholding_factor = 6.0;
-  double sensor_noise_param_1 = 0.0012;  // From Nguyen et al. (2012)
-  double sensor_noise_param_2 = 0.0019;  // From Nguyen et al. (2012)
-  double sensor_noise_param_3 = 0.0001;  // From Nguyen et al. (2012)
+  double sensor_noise_param_1st_order = 0.0012;  // From Nguyen et al. (2012)
+  double sensor_noise_param_2nd_order = 0.0019;  // From Nguyen et al. (2012)
+  double sensor_noise_param_3rd_order = 0.0001;  // From Nguyen et al. (2012)
   double sensor_min_distance = 0.2;
 };
 
