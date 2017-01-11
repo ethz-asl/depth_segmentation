@@ -43,9 +43,9 @@ struct MaxDistanceMapParams {
                                         // it.
   bool use_threshold = true;
   double noise_thresholding_factor = 6.0;
-  double sensor_noise_param_1 = 0.0012;  // From Nguyen et al. (2012)
-  double sensor_noise_param_2 = 0.0019;  // From Nguyen et al. (2012)
-  double sensor_noise_param_3 = 0.0001;  // From Nguyen et al. (2012)
+  double sensor_noise_param_1st_order = 0.0012;  // From Nguyen et al. (2012)
+  double sensor_noise_param_2nd_order = 0.0019;  // From Nguyen et al. (2012)
+  double sensor_noise_param_3rd_order = 0.0001;  // From Nguyen et al. (2012)
   double sensor_min_distance = 0.2;
 };
 
@@ -97,8 +97,6 @@ struct IsNotNan {
 };
 
 struct Params {
-  Params()
-      : final_edge(), label(), max_distance(), min_convexity(), normals() {}
   FinalEdgeMapParams final_edge;
   LabelMapParams label;
   MaxDistanceMapParams max_distance;
@@ -277,9 +275,8 @@ void computeOwnNormals(const SurfaceNormalParams& params,
           normals->at<cv::Vec3f>(y, x) = -normals->at<cv::Vec3f>(y, x);
         }
       } else {
-        for (size_t coordinate = 0u; coordinate < 3u; ++coordinate) {
-          normals->at<cv::Vec3f>(y, x)[coordinate] = float_nan;
-        }
+        normals->at<cv::Vec3f>(y, x) =
+            cv::Vec3f(float_nan, float_nan, float_nan);
       }
     }
   }
