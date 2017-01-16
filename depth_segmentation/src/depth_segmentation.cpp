@@ -164,7 +164,7 @@ void DepthSegmenter::initialize() {
   rgbd_normals_ = cv::rgbd::RgbdNormals(
       depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
       depth_camera_.getCameraMatrix(), params_.normals.window_size,
-      params_.normals.method);
+      static_cast<int>(params_.normals.method));
   LOG(INFO) << "DepthSegmenter initialized";
 }
 
@@ -184,7 +184,7 @@ void DepthSegmenter::dynamicReconfigureCallback(
     return;
   }
   if (config.normals_method !=
-          SurfaceNormalEstimationMethod::kDepthWindowFilter &&
+          static_cast<int>(SurfaceNormalEstimationMethod::kDepthWindowFilter) &&
       config.normals_window_size >= 8u) {
     // Resetting the config value to its previous value.
     config.normals_window_size = params_.normals.window_size;
@@ -192,7 +192,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
                   "than 7.";
     return;
   }
-  params_.normals.method = config.normals_method;
+  params_.normals.method =
+      static_cast<SurfaceNormalEstimationMethod>(config.normals_method);
   params_.normals.distance_factor_threshold =
       config.normals_distance_factor_threshold;
   params_.normals.window_size = config.normals_window_size;
@@ -254,7 +255,7 @@ void DepthSegmenter::dynamicReconfigureCallback(
   params_.final_edge.display = config.final_edge_display;
 
   // Label map params.
-  params_.label.method = config.label_method;
+  params_.label.method = static_cast<LabelMapMethod>(config.label_method);
   params_.label.min_size = config.label_min_size;
   params_.label.use_inpaint = config.label_use_inpaint;
   params_.label.inpaint_method = config.label_inpaint_method;
