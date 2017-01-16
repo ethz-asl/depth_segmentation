@@ -600,8 +600,11 @@ void DepthSegmenter::inpaintImage(const cv::Mat& depth_image,
                                   const cv::Mat& label_map,
                                   cv::Mat* inpainted) {
   CHECK(!depth_image.empty());
+  CHECK_EQ(depth_image.type(), CV_32FC1);
   CHECK(!edge_map.empty());
+  CHECK_EQ(edge_map.type(), CV_32FC1);
   CHECK(!label_map.empty());
+  CHECK_EQ(label_map.type(), CV_8UC3);
   CHECK_EQ(depth_image.size(), edge_map.size());
   CHECK_EQ(depth_image.size(), label_map.size());
   CHECK_NOTNULL(inpainted);
@@ -621,8 +624,11 @@ void DepthSegmenter::inpaintImage(const cv::Mat& depth_image,
 
 void DepthSegmenter::labelMap(const cv::Mat& depth_image,
                               const cv::Mat& edge_map, cv::Mat* labeled_map) {
+  CHECK(!depth_image.empty());
+  CHECK_EQ(depth_image.type(), CV_32FC1);
   CHECK(!edge_map.empty());
   CHECK_EQ(edge_map.type(), CV_32FC1);
+  CHECK_EQ(depth_image.size(), edge_map.size());
   CHECK_NOTNULL(labeled_map);
 
   cv::Mat output = cv::Mat::zeros(depth_image.size(), CV_8UC3);
