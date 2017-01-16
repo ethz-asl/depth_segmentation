@@ -595,25 +595,28 @@ void DepthSegmenter::findBlobs(const cv::Mat& binary,
   }
 }
 
-void DepthSegmenter::inpaintImage(const cv::Mat& image, cv::Mat* inpainted) {
-  CHECK(false) << "THIS IS UNTESTED AND PROBABLY SOMEWHAT WRONG.";
-  CHECK(!image.empty());
+void DepthSegmenter::inpaintImage(const cv::Mat& depth_image,
+                                  const cv::Mat& edge_map,
+                                  const cv::Mat& label_map,
+                                  cv::Mat* inpainted) {
+  CHECK(!depth_image.empty());
+  CHECK(!edge_map.empty());
+  CHECK(!label_map.empty());
+  CHECK_EQ(depth_image.size(), edge_map.size());
+  CHECK_EQ(depth_image.size(), label_map.size());
   CHECK_NOTNULL(inpainted);
-  cv::Mat border_image;
-  cv::Mat inpainted_8bit;
-  double inpaint_radius = 3.0;
-  int make_border = 1;
-  cv::copyMakeBorder(image, border_image, make_border, make_border, make_border,
-                     make_border, cv::BORDER_REPLICATE);
-  border_image.convertTo(border_image, CV_8UC3, 255.0f);
-  cv::inpaint(border_image, (border_image == border_image), inpainted_8bit,
-              inpaint_radius, cv::INPAINT_TELEA);
-  inpainted_8bit.convertTo(inpainted_8bit, CV_32FC3, 1.0f / 255.0f);
-  *inpainted = inpainted_8bit(
-      cv::Rect(make_border, make_border, image.cols, image.rows));
-  cv::namedWindow("inpainted", CV_WINDOW_AUTOSIZE);
-  cv::imshow("inpainted", *inpainted);
-  cv::waitKey(1);
+  cv::Mat mask = cv::Mat::zeros(edge_map.size(), CV_8UC1);
+  cv::Mat mask_edge = cv::Mat::zeros(edge_map.size(), CV_8UC1);
+  cv::Mat gray_edge;
+  cv::cvtColor(label_map, gray_edge, CV_BGR2GRAY);
+  mask_edge = (gray_edge == 0);
+
+  cv::Mat mask_depth = cv::Mat::zeros(depth_image.size(), CV_8UC1);
+  mask_depth = (depth_image == depth_image);
+  mask = mask_depth.mul(mask_edge);
+  constexpr double kInpaintRadius = 1.0;
+  cv::inpaint(label_map, mask, *inpainted, kInpaintRadius,
+              params_.label.inpaint_method);
 }
 
 void DepthSegmenter::labelMap(const cv::Mat& depth_image,
@@ -686,16 +689,7 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
   }
 
   if (params_.label.use_inpaint) {
-    cv::Mat mask = cv::Mat::zeros(edge_map.size(), CV_8UC1);
-    cv::Mat mask_edge = cv::Mat::zeros(edge_map.size(), CV_8UC1);
-    cv::Mat gray_edge;
-    cv::cvtColor(output, gray_edge, CV_BGR2GRAY);
-    mask_edge = (gray_edge == 0);
-
-    cv::Mat mask_depth = cv::Mat::zeros(depth_image.size(), CV_8UC1);
-    mask_depth = (depth_image == depth_image);
-    mask = mask_depth.mul(mask_edge);
-    cv::inpaint(output, mask, output, 1.0, params_.label.inpaint_method);
+    inpaintImage(depth_image, edge_map, output, &output);
   }
 
   if (params_.label.display) {

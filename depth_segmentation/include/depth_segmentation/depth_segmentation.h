@@ -149,7 +149,8 @@ class DepthSegmenter {
   void edgeMap(const cv::Mat& image, cv::Mat* edge_map);
   void labelMap(const cv::Mat& depth_map, const cv::Mat& edge_map,
                 cv::Mat* labeled_map);
-  void inpaintImage(const cv::Mat& image, cv::Mat* inpainted);
+  void inpaintImage(const cv::Mat& depth_image, const cv::Mat& edge_map,
+                    const cv::Mat& label_map, cv::Mat* inpainted);
   void findBlobs(const cv::Mat& binary,
                  std::vector<std::vector<cv::Point2i>>* labels);
   inline DepthCamera getDepthCamera() const { return depth_camera_; }
