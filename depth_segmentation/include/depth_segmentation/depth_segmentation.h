@@ -156,11 +156,13 @@ class DepthSegmenter {
   inline DepthCamera getDepthCamera() const { return depth_camera_; }
 
  private:
+  void generateRandomColors(size_t contours_size,
+                            std::vector<cv::Scalar>* colors);
   const DepthCamera& depth_camera_;
-
   Params& params_;
 
   cv::rgbd::RgbdNormals rgbd_normals_;
+  std::vector<cv::Scalar> colors_;
 };
 }
 

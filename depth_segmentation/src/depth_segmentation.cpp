@@ -622,6 +622,21 @@ void DepthSegmenter::inpaintImage(const cv::Mat& depth_image,
               params_.label.inpaint_method);
 }
 
+void DepthSegmenter::generateRandomColors(size_t contours_size,
+                                          std::vector<cv::Scalar>* colors) {
+  CHECK_GE(contours_size, 0u);
+  CHECK_NOTNULL(colors);
+  if (colors_.size() < contours_size) {
+    colors_.reserve(contours_size);
+    for (size_t i = colors_.size(); i < contours_size; i++) {
+      colors_.push_back(cv::Scalar(255 * (rand() / (1.0 + RAND_MAX)),
+                                   255 * (rand() / (1.0 + RAND_MAX)),
+                                   255 * (rand() / (1.0 + RAND_MAX))));
+    }
+  }
+  *colors = colors_;
+}
+
 void DepthSegmenter::labelMap(const cv::Mat& depth_image,
                               const cv::Mat& edge_map, cv::Mat* labeled_map) {
   CHECK(!depth_image.empty());
@@ -639,16 +654,14 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
       std::vector<cv::Vec4i> hierarchy;
       cv::Mat edge_map_8u;
       edge_map.convertTo(edge_map_8u, CV_8U);
+      static const cv::Point kContourOffset = cv::Point(0, 0);
       cv::findContours(edge_map_8u, contours, hierarchy, CV_RETR_TREE,
-                       CV_CHAIN_APPROX_SIMPLE, cv::Point(0, 0));
+                       CV_CHAIN_APPROX_SIMPLE, kContourOffset);
       cv::Mat drawing = cv::Mat::zeros(output.size(), CV_8UC3);
       std::vector<cv::Point> approximate_shape;
+
       std::vector<cv::Scalar> colors;
-      for (size_t i = 0u; i < contours.size(); i++) {
-        colors.push_back(cv::Scalar(255 * (rand() / (1.0 + RAND_MAX)),
-                                    255 * (rand() / (1.0 + RAND_MAX)),
-                                    255 * (rand() / (1.0 + RAND_MAX))));
-      }
+      generateRandomColors(contours.size(), &colors);
       for (size_t i = 0u; i < contours.size(); i++) {
         double area = cv::contourArea(contours[i]);
         if (area < params_.label.min_size) {
@@ -662,7 +675,7 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
         }
       }
       for (size_t i = 0u; i < contours.size(); i++) {
-        drawContours(output, contours, i, cv::Scalar(colors[i]), CV_FILLED);
+        drawContours(output, contours, i, colors[i], CV_FILLED);
       }
       break;
     }
@@ -675,16 +688,16 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
                     kMaxBinaryValue, cv::THRESH_BINARY);
       std::vector<std::vector<cv::Point2i>> labels;
       findBlobs(binary_edge_map, &labels);
+
+      std::vector<cv::Scalar> colors;
+      generateRandomColors(labels.size(), &colors);
       // Randomly color the labels
       for (size_t i = 0u; i < labels.size(); ++i) {
-        const unsigned char r = 255 * (rand() / (1.0 + RAND_MAX));
-        const unsigned char g = 255 * (rand() / (1.0 + RAND_MAX));
-        const unsigned char b = 255 * (rand() / (1.0 + RAND_MAX));
         cv::Vec3b color;
         if (labels[i].size() < params_.label.min_size) {
           color = cv::Vec3b(0, 0, 0);
         } else {
-          color = cv::Vec3b(b, g, r);
+          color = cv::Vec3b(colors[i][0], colors[i][1], colors[i][2]);
         }
         for (size_t j = 0u; j < labels[i].size(); ++j) {
           const size_t x = labels[i][j].x;
