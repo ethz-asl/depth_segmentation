@@ -634,6 +634,7 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
   cv::Mat output = cv::Mat::zeros(depth_image.size(), CV_8UC3);
   switch (params_.label.method) {
     case LabelMapMethod::kContour: {
+      // TODO(ff): Move to method.
       std::vector<std::vector<cv::Point>> contours;
       std::vector<cv::Vec4i> hierarchy;
       cv::Mat edge_map_8u;
@@ -666,6 +667,7 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
       break;
     }
     case LabelMapMethod::kFloodFill: {
+      // TODO(ff): Move to method.
       cv::Mat binary_edge_map;
       constexpr float kEdgeMapThresholdValue = 0.0f;
       constexpr float kMaxBinaryValue = 1.0f;
