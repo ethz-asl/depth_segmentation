@@ -608,15 +608,12 @@ void DepthSegmenter::inpaintImage(const cv::Mat& depth_image,
   CHECK_EQ(depth_image.size(), edge_map.size());
   CHECK_EQ(depth_image.size(), label_map.size());
   CHECK_NOTNULL(inpainted);
-  cv::Mat mask = cv::Mat::zeros(edge_map.size(), CV_8UC1);
-  cv::Mat mask_edge = cv::Mat::zeros(edge_map.size(), CV_8UC1);
   cv::Mat gray_edge;
   cv::cvtColor(label_map, gray_edge, CV_BGR2GRAY);
-  mask_edge = (gray_edge == 0);
 
-  cv::Mat mask_depth = cv::Mat::zeros(depth_image.size(), CV_8UC1);
-  mask_depth = (depth_image == depth_image);
-  mask = mask_depth.mul(mask_edge);
+  cv::Mat mask = cv::Mat::zeros(edge_map.size(), CV_8UC1);
+  // We set the mask to 1 where we have depth values but no label.
+  cv::bitwise_and(depth_image == depth_image, gray_edge == 0, mask);
   constexpr double kInpaintRadius = 1.0;
   cv::inpaint(label_map, mask, *inpainted, kInpaintRadius,
               params_.label.inpaint_method);
