@@ -731,7 +731,6 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
 
       std::vector<cv::Scalar> colors;
       std::vector<int> labels;
-      // TODO(ff): Fix the labels.
       generateRandomColorsAndLabels(labeled_segments.size(), &colors, &labels);
       segments->resize(labeled_segments.size());
       // Assign the colors and labels to the segments.

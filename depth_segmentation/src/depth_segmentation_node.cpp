@@ -119,9 +119,8 @@ class DepthSegmentationNode {
         depth_segmentation::kTfWorldFrame));
   }
 
-  void publish_segments(const std::vector<std::vector<cv::Vec3f>>& segments) {
-    // TODO(ff): use the timestamp of the depth image instead.
-    ros::Time ros_now = ros::Time::now();
+  void publish_segments(const std::vector<std::vector<cv::Vec3f>>& segments,
+                        const ros::Time& timestamp) {
     pcl::PointCloud<PointType>::Ptr scene_pcl(new pcl::PointCloud<PointType>);
     for (std::vector<cv::Vec3f> segment : segments) {
       pcl::PointCloud<PointType>::Ptr segment_pcl(
@@ -142,7 +141,7 @@ class DepthSegmentationNode {
       }
       sensor_msgs::PointCloud2 pcl2_msg;
       pcl::toROSMsg(*segment_pcl, pcl2_msg);
-      pcl2_msg.header.stamp = ros_now;
+      pcl2_msg.header.stamp = timestamp;
       pcl2_msg.header.frame_id = "camera_depth_optical_frame";
       point_cloud2_segment_pub_.publish(pcl2_msg);
     }
@@ -151,7 +150,7 @@ class DepthSegmentationNode {
     // https://github.com/ros-visualization/rviz/issues/689
     sensor_msgs::PointCloud2 pcl2_msg;
     pcl::toROSMsg(*scene_pcl, pcl2_msg);
-    pcl2_msg.header.stamp = ros_now;
+    pcl2_msg.header.stamp = timestamp;
     pcl2_msg.header.frame_id = "camera_depth_optical_frame";
     point_cloud2_scene_pub_.publish(pcl2_msg);
   }
@@ -242,7 +241,7 @@ class DepthSegmentationNode {
         std::vector<std::vector<cv::Vec3f>> segments;
         depth_segmenter_.labelMap(rescaled_depth, depth_map, edge_map,
                                   &label_map, &segments);
-        publish_segments(segments);
+        publish_segments(segments, depth_msg->header.stamp);
 
         // Update the member images to the new images.
         // TODO(ff): Consider only doing this, when we are far enough away
