@@ -12,7 +12,7 @@ namespace depth_segmentation {
 
 const static std::string kDebugWindowName = "DebugImages";
 
-enum SurfaceNormalEstimationMethod {
+enum class SurfaceNormalEstimationMethod {
   kFals = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS,
   kLinemod = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_LINEMOD,
   kSri = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_SRI,
@@ -28,7 +28,8 @@ struct SurfaceNormalParams {
     }
   }
   size_t window_size = 11u;
-  size_t method = SurfaceNormalEstimationMethod::kDepthWindowFilter;
+  SurfaceNormalEstimationMethod method =
+      SurfaceNormalEstimationMethod::kDepthWindowFilter;
   bool display = false;
   double distance_factor_threshold = 0.01;
 };
@@ -69,7 +70,16 @@ struct FinalEdgeMapParams {
   bool display = false;
 };
 
+enum class LabelMapMethod {
+  kFloodFill = 0,
+  kContour = 1,
+};
+
 struct LabelMapParams {
+  LabelMapMethod method = LabelMapMethod::kContour;
+  size_t min_size = 1u;
+  bool use_inpaint = false;
+  size_t inpaint_method = 0u;
   bool display = true;
 };
 

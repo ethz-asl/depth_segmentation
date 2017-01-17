@@ -4,6 +4,7 @@
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/photo/photo.hpp>
 
 namespace depth_segmentation {
@@ -59,6 +60,7 @@ bool CameraTracker::computeTransform(const cv::Mat& src_rgb_image,
   }
   return success;
 }
+
 void CameraTracker::visualize(const cv::Mat old_depth_image,
                               const cv::Mat new_depth_image) const {
   CHECK(!old_depth_image.empty());
@@ -163,7 +165,7 @@ void DepthSegmenter::initialize() {
   rgbd_normals_ = cv::rgbd::RgbdNormals(
       depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
       depth_camera_.getCameraMatrix(), params_.normals.window_size,
-      params_.normals.method);
+      static_cast<int>(params_.normals.method));
   LOG(INFO) << "DepthSegmenter initialized";
 }
 
@@ -183,7 +185,7 @@ void DepthSegmenter::dynamicReconfigureCallback(
     return;
   }
   if (config.normals_method !=
-          SurfaceNormalEstimationMethod::kDepthWindowFilter &&
+          static_cast<int>(SurfaceNormalEstimationMethod::kDepthWindowFilter) &&
       config.normals_window_size >= 8u) {
     // Resetting the config value to its previous value.
     config.normals_window_size = params_.normals.window_size;
@@ -191,7 +193,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
                   "than 7.";
     return;
   }
-  params_.normals.method = config.normals_method;
+  params_.normals.method =
+      static_cast<SurfaceNormalEstimationMethod>(config.normals_method);
   params_.normals.distance_factor_threshold =
       config.normals_distance_factor_threshold;
   params_.normals.window_size = config.normals_window_size;
@@ -250,8 +253,13 @@ void DepthSegmenter::dynamicReconfigureCallback(
       config.final_edge_use_morphological_opening;
   params_.final_edge.use_morphological_closing =
       config.final_edge_use_morphological_closing;
+  params_.final_edge.display = config.final_edge_display;
 
   // Label map params.
+  params_.label.method = static_cast<LabelMapMethod>(config.label_method);
+  params_.label.min_size = config.label_min_size;
+  params_.label.use_inpaint = config.label_use_inpaint;
+  params_.label.inpaint_method = config.label_inpaint_method;
   params_.label.display = config.label_display;
 
   LOG(INFO) << "Dynamic Reconfigure Request.";
@@ -542,6 +550,7 @@ void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
   }
 
   *edge_map = convexity_map - distance_map;
+  // TODO(ff): Perform morphological operations (also) on edge_map.
   if (params_.final_edge.display) {
     static const std::string kWindowName = "FinalEdgeMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
@@ -587,57 +596,122 @@ void DepthSegmenter::findBlobs(const cv::Mat& binary,
   }
 }
 
-void DepthSegmenter::inpaintImage(const cv::Mat& image, cv::Mat* inpainted) {
-  CHECK(false) << "THIS IS UNTESTED AND PROBABLY SOMEWHAT WRONG.";
-  CHECK(!image.empty());
-  CHECK_NOTNULL(inpainted);
-  cv::Mat border_image;
-  cv::Mat inpainted_8bit;
-  double inpaint_radius = 3.0;
-  int make_border = 1;
-  cv::copyMakeBorder(image, border_image, make_border, make_border, make_border,
-                     make_border, cv::BORDER_REPLICATE);
-  border_image.convertTo(border_image, CV_8UC3, 255.0f);
-  cv::inpaint(border_image, (border_image == border_image), inpainted_8bit,
-              inpaint_radius, cv::INPAINT_TELEA);
-  inpainted_8bit.convertTo(inpainted_8bit, CV_32FC3, 1.0f / 255.0f);
-  *inpainted = inpainted_8bit(
-      cv::Rect(make_border, make_border, image.cols, image.rows));
-  cv::namedWindow("inpainted", CV_WINDOW_AUTOSIZE);
-  cv::imshow("inpainted", *inpainted);
-  cv::waitKey(1);
-}
-
-void DepthSegmenter::labelMap(const cv::Mat& edge_map, cv::Mat* labeled_map) {
+void DepthSegmenter::inpaintImage(const cv::Mat& depth_image,
+                                  const cv::Mat& edge_map,
+                                  const cv::Mat& label_map,
+                                  cv::Mat* inpainted) {
+  CHECK(!depth_image.empty());
+  CHECK_EQ(depth_image.type(), CV_32FC1);
   CHECK(!edge_map.empty());
   CHECK_EQ(edge_map.type(), CV_32FC1);
-  CHECK_NOTNULL(labeled_map);
-  cv::RNG rng(12345);
-  cv::Mat binary_edge_map;
+  CHECK(!label_map.empty());
+  CHECK_EQ(label_map.type(), CV_8UC3);
+  CHECK_EQ(depth_image.size(), edge_map.size());
+  CHECK_EQ(depth_image.size(), label_map.size());
+  CHECK_NOTNULL(inpainted);
+  cv::Mat gray_edge;
+  cv::cvtColor(label_map, gray_edge, CV_BGR2GRAY);
 
-  std::vector<std::vector<cv::Point2i>> labels;
-  constexpr float kEdgeMapThresholdValue = 0.0f;
-  constexpr float kMaxBinaryValue = 1.0f;
-  cv::threshold(edge_map, binary_edge_map, kEdgeMapThresholdValue,
-                kMaxBinaryValue, cv::THRESH_BINARY);
-  findBlobs(binary_edge_map, &labels);
-  cv::Mat output = cv::Mat::zeros(binary_edge_map.size(), CV_8UC3);
+  cv::Mat mask = cv::Mat::zeros(edge_map.size(), CV_8UC1);
+  // We set the mask to 1 where we have depth values but no label.
+  cv::bitwise_and(depth_image == depth_image, gray_edge == 0, mask);
+  constexpr double kInpaintRadius = 1.0;
+  cv::inpaint(label_map, mask, *inpainted, kInpaintRadius,
+              params_.label.inpaint_method);
+}
 
-  // Randomly color the labels
-  for (size_t i = 0u; i < labels.size(); ++i) {
-    unsigned char r = 255 * (rand() / (1.0 + RAND_MAX));
-    unsigned char g = 255 * (rand() / (1.0 + RAND_MAX));
-    unsigned char b = 255 * (rand() / (1.0 + RAND_MAX));
-
-    for (size_t j = 0u; j < labels[i].size(); ++j) {
-      int x = labels[i][j].x;
-      int y = labels[i][j].y;
-
-      output.at<cv::Vec3b>(y, x)[0] = b;
-      output.at<cv::Vec3b>(y, x)[1] = g;
-      output.at<cv::Vec3b>(y, x)[2] = r;
+void DepthSegmenter::generateRandomColors(size_t contours_size,
+                                          std::vector<cv::Scalar>* colors) {
+  CHECK_GE(contours_size, 0u);
+  CHECK_NOTNULL(colors)->clear();
+  if (colors_.size() < contours_size) {
+    colors_.reserve(contours_size);
+    for (size_t i = colors_.size(); i < contours_size; ++i) {
+      colors_.push_back(cv::Scalar(255 * (rand() / (1.0 + RAND_MAX)),
+                                   255 * (rand() / (1.0 + RAND_MAX)),
+                                   255 * (rand() / (1.0 + RAND_MAX))));
     }
   }
+  *colors = colors_;
+}
+
+void DepthSegmenter::labelMap(const cv::Mat& depth_image,
+                              const cv::Mat& edge_map, cv::Mat* labeled_map) {
+  CHECK(!depth_image.empty());
+  CHECK_EQ(depth_image.type(), CV_32FC1);
+  CHECK(!edge_map.empty());
+  CHECK_EQ(edge_map.type(), CV_32FC1);
+  CHECK_EQ(depth_image.size(), edge_map.size());
+  CHECK_NOTNULL(labeled_map);
+
+  cv::Mat output = cv::Mat::zeros(depth_image.size(), CV_8UC3);
+  switch (params_.label.method) {
+    case LabelMapMethod::kContour: {
+      // TODO(ff): Move to method.
+      std::vector<std::vector<cv::Point>> contours;
+      std::vector<cv::Vec4i> hierarchy;
+      cv::Mat edge_map_8u;
+      edge_map.convertTo(edge_map_8u, CV_8U);
+      static const cv::Point kContourOffset = cv::Point(0, 0);
+      cv::findContours(edge_map_8u, contours, hierarchy, CV_RETR_TREE,
+                       CV_CHAIN_APPROX_SIMPLE, kContourOffset);
+      cv::Mat drawing = cv::Mat::zeros(output.size(), CV_8UC3);
+      std::vector<cv::Point> approximate_shape;
+
+      std::vector<cv::Scalar> colors;
+      generateRandomColors(contours.size(), &colors);
+      for (size_t i = 0u; i < contours.size(); ++i) {
+        const double area = cv::contourArea(contours[i]);
+        if (area < params_.label.min_size) {
+          constexpr int kNoParentContour = -1;
+          if (hierarchy[i][3] == kNoParentContour) {
+            // Assign black color to areas that have no parent contour.
+            colors[i] = cv::Scalar(0, 0, 0);
+          } else {
+            // Assign the color of the parent contour.
+            colors[i] = colors[hierarchy[i][3]];
+          }
+        }
+      }
+      for (size_t i = 0u; i < contours.size(); i++) {
+        drawContours(output, contours, i, colors[i], CV_FILLED);
+      }
+      break;
+    }
+    case LabelMapMethod::kFloodFill: {
+      // TODO(ff): Move to method.
+      cv::Mat binary_edge_map;
+      constexpr float kEdgeMapThresholdValue = 0.0f;
+      constexpr float kMaxBinaryValue = 1.0f;
+      cv::threshold(edge_map, binary_edge_map, kEdgeMapThresholdValue,
+                    kMaxBinaryValue, cv::THRESH_BINARY);
+      std::vector<std::vector<cv::Point2i>> labels;
+      findBlobs(binary_edge_map, &labels);
+
+      std::vector<cv::Scalar> colors;
+      generateRandomColors(labels.size(), &colors);
+      // Randomly color the labels
+      for (size_t i = 0u; i < labels.size(); ++i) {
+        cv::Vec3b color;
+        if (labels[i].size() < params_.label.min_size) {
+          color = cv::Vec3b(0, 0, 0);
+        } else {
+          color = cv::Vec3b(colors[i][0], colors[i][1], colors[i][2]);
+        }
+        for (size_t j = 0u; j < labels[i].size(); ++j) {
+          const size_t x = labels[i][j].x;
+          const size_t y = labels[i][j].y;
+          output.at<cv::Vec3b>(y, x) = color;
+        }
+      }
+      break;
+    }
+  }
+
+  if (params_.label.use_inpaint) {
+    inpaintImage(depth_image, edge_map, output, &output);
+  }
+
   if (params_.label.display) {
     static const std::string kWindowName = "LabelMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);

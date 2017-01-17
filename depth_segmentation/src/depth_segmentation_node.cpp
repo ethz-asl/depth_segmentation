@@ -187,7 +187,7 @@ class DepthSegmentationNode {
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                              &edge_map);
         cv::Mat label_map(edge_map.size(), CV_32FC1);
-        depth_segmenter_.labelMap(edge_map, &label_map);
+        depth_segmenter_.labelMap(rescaled_depth, edge_map, &label_map);
 
         // Update the member images to the new images.
         // TODO(ff): Consider only doing this, when we are far enough away
