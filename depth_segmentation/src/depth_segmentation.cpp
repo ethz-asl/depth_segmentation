@@ -60,6 +60,7 @@ bool CameraTracker::computeTransform(const cv::Mat& src_rgb_image,
   }
   return success;
 }
+
 void CameraTracker::visualize(const cv::Mat old_depth_image,
                               const cv::Mat new_depth_image) const {
   CHECK(!old_depth_image.empty());
@@ -622,10 +623,10 @@ void DepthSegmenter::inpaintImage(const cv::Mat& depth_image,
 void DepthSegmenter::generateRandomColors(size_t contours_size,
                                           std::vector<cv::Scalar>* colors) {
   CHECK_GE(contours_size, 0u);
-  CHECK_NOTNULL(colors);
+  CHECK_NOTNULL(colors)->clear();
   if (colors_.size() < contours_size) {
     colors_.reserve(contours_size);
-    for (size_t i = colors_.size(); i < contours_size; i++) {
+    for (size_t i = colors_.size(); i < contours_size; ++i) {
       colors_.push_back(cv::Scalar(255 * (rand() / (1.0 + RAND_MAX)),
                                    255 * (rand() / (1.0 + RAND_MAX)),
                                    255 * (rand() / (1.0 + RAND_MAX))));
@@ -659,10 +660,11 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
 
       std::vector<cv::Scalar> colors;
       generateRandomColors(contours.size(), &colors);
-      for (size_t i = 0u; i < contours.size(); i++) {
-        double area = cv::contourArea(contours[i]);
+      for (size_t i = 0u; i < contours.size(); ++i) {
+        const double area = cv::contourArea(contours[i]);
         if (area < params_.label.min_size) {
-          if (hierarchy[i][3] == -1) {
+          constexpr int kNoParentContour = -1;
+          if (hierarchy[i][3] == kNoParentContour) {
             // Assign black color to areas that have no parent contour.
             colors[i] = cv::Scalar(0, 0, 0);
           } else {
