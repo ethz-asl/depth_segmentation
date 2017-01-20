@@ -687,7 +687,8 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
           }
         }
       }
-      cv::Mat output_labels = cv::Mat::zeros(depth_image.size(), CV_32SC1);
+      cv::Mat output_labels =
+          cv::Mat(depth_image.size(), CV_32SC1, cv::Scalar(-1));
       for (size_t i = 0u; i < contours.size(); ++i) {
         drawContours(output, contours, i, cv::Scalar(colors[i]), CV_FILLED);
         drawContours(output_labels, contours, i, cv::Scalar(labels[i]),
@@ -710,11 +711,11 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
       for (size_t x = 0u; x < output_labels.cols; ++x) {
         for (size_t y = 0u; y < output_labels.rows; ++y) {
           const int32_t label = output_labels.at<int32_t>(y, x);
-          const std::map<size_t, size_t>::const_iterator label_map_iterator =
-              labels_map.find(label);
-          // Append vectors from depth_map to vectors of segments.
-          if (label_map_iterator == labels_map.end()) {
-            (*segments)[label_map_iterator->second].push_back(
+          if (label < 0) {
+            continue;
+          } else {
+            // Append vectors from depth_map to vectors of segments.
+            (*segments)[labels_map.at(label)].push_back(
                 depth_map.at<cv::Vec3f>(y, x));
           }
         }
