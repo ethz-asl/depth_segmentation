@@ -147,8 +147,9 @@ class DepthSegmenter {
   void computeFinalEdgeMap(const cv::Mat& convexity_map,
                            const cv::Mat& distance_map, cv::Mat* edge_map);
   void edgeMap(const cv::Mat& image, cv::Mat* edge_map);
-  void labelMap(const cv::Mat& depth_map, const cv::Mat& edge_map,
-                cv::Mat* labeled_map);
+  void labelMap(const cv::Mat& depth_image, const cv::Mat& depth_map,
+                const cv::Mat& edge_map, cv::Mat* labeled_map,
+                std::vector<std::vector<cv::Vec3f>>* segments);
   void inpaintImage(const cv::Mat& depth_image, const cv::Mat& edge_map,
                     const cv::Mat& label_map, cv::Mat* inpainted);
   void findBlobs(const cv::Mat& binary,
@@ -156,13 +157,15 @@ class DepthSegmenter {
   inline DepthCamera getDepthCamera() const { return depth_camera_; }
 
  private:
-  void generateRandomColors(size_t contours_size,
-                            std::vector<cv::Scalar>* colors);
+  void generateRandomColorsAndLabels(size_t contours_size,
+                                     std::vector<cv::Scalar>* colors,
+                                     std::vector<int>* labels);
   const DepthCamera& depth_camera_;
   Params& params_;
 
   cv::rgbd::RgbdNormals rgbd_normals_;
   std::vector<cv::Scalar> colors_;
+  std::vector<int> labels_;
 };
 }
 

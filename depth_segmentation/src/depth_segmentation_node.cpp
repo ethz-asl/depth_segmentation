@@ -6,8 +6,13 @@
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/synchronizer.h>
+#include <pcl/PCLPointCloud2.h>
+#include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl_ros/point_cloud.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/image_encodings.h>
 #include <tf/transform_broadcaster.h>
 #include <Eigen/Core>
@@ -17,6 +22,8 @@
 
 #include "depth_segmentation/depth_segmentation.h"
 #include "depth_segmentation/ros_common.h"
+
+typedef pcl::PointXYZRGB PointType;
 
 class DepthSegmentationNode {
  public:
@@ -43,6 +50,11 @@ class DepthSegmentationNode {
         boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
     camera_info_sync_policy_.registerCallback(
         boost::bind(&DepthSegmentationNode::cameraInfoCallback, this, _1, _2));
+    point_cloud2_segment_pub_ =
+        node_handle_.advertise<sensor_msgs::PointCloud2>("object_segment",
+                                                         1000);
+    point_cloud2_scene_pub_ =
+        node_handle_.advertise<sensor_msgs::PointCloud2>("segmented_scene", 1);
   }
 
  private:
@@ -74,6 +86,9 @@ class DepthSegmentationNode {
   image_transport::SubscriberFilter depth_image_sub_;
   image_transport::SubscriberFilter rgb_image_sub_;
 
+  ros::Publisher point_cloud2_segment_pub_;
+  ros::Publisher point_cloud2_scene_pub_;
+
   message_filters::Synchronizer<ImageSyncPolicy> image_sync_policy_;
   message_filters::Synchronizer<CameraInfoSyncPolicy> camera_info_sync_policy_;
 
@@ -102,6 +117,42 @@ class DepthSegmentationNode {
     transform_broadcaster_.sendTransform(tf::StampedTransform(
         transform, timestamp, depth_segmentation::kTfDepthCameraFrame,
         depth_segmentation::kTfWorldFrame));
+  }
+
+  void publish_segments(const std::vector<std::vector<cv::Vec3f>>& segments,
+                        const ros::Time& timestamp) {
+    pcl::PointCloud<PointType>::Ptr scene_pcl(new pcl::PointCloud<PointType>);
+    for (std::vector<cv::Vec3f> segment : segments) {
+      pcl::PointCloud<PointType>::Ptr segment_pcl(
+          new pcl::PointCloud<PointType>);
+      const unsigned char r = rand() % 255;
+      const unsigned char g = rand() % 255;
+      const unsigned char b = rand() % 255;
+      for (cv::Vec3f point : segment) {
+        PointType point_pcl;
+        point_pcl.x = point[0];
+        point_pcl.y = point[1];
+        point_pcl.z = point[2];
+        point_pcl.r = r;
+        point_pcl.g = g;
+        point_pcl.b = b;
+        segment_pcl->push_back(point_pcl);
+        scene_pcl->push_back(point_pcl);
+      }
+      sensor_msgs::PointCloud2 pcl2_msg;
+      pcl::toROSMsg(*segment_pcl, pcl2_msg);
+      pcl2_msg.header.stamp = timestamp;
+      pcl2_msg.header.frame_id = "camera_depth_optical_frame";
+      point_cloud2_segment_pub_.publish(pcl2_msg);
+    }
+    // Just for rviz also publish the whole scene, as otherwise only ~10
+    // segments are shown:
+    // https://github.com/ros-visualization/rviz/issues/689
+    sensor_msgs::PointCloud2 pcl2_msg;
+    pcl::toROSMsg(*scene_pcl, pcl2_msg);
+    pcl2_msg.header.stamp = timestamp;
+    pcl2_msg.header.frame_id = "camera_depth_optical_frame";
+    point_cloud2_scene_pub_.publish(pcl2_msg);
   }
 
   void imageCallback(const sensor_msgs::Image::ConstPtr& depth_msg,
@@ -187,7 +238,10 @@ class DepthSegmentationNode {
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                              &edge_map);
         cv::Mat label_map(edge_map.size(), CV_32FC1);
-        depth_segmenter_.labelMap(rescaled_depth, edge_map, &label_map);
+        std::vector<std::vector<cv::Vec3f>> segments;
+        depth_segmenter_.labelMap(rescaled_depth, depth_map, edge_map,
+                                  &label_map, &segments);
+        publish_segments(segments, depth_msg->header.stamp);
 
         // Update the member images to the new images.
         // TODO(ff): Consider only doing this, when we are far enough away

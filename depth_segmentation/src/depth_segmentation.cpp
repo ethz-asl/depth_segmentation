@@ -620,29 +620,39 @@ void DepthSegmenter::inpaintImage(const cv::Mat& depth_image,
               params_.label.inpaint_method);
 }
 
-void DepthSegmenter::generateRandomColors(size_t contours_size,
-                                          std::vector<cv::Scalar>* colors) {
+void DepthSegmenter::generateRandomColorsAndLabels(
+    size_t contours_size, std::vector<cv::Scalar>* colors,
+    std::vector<int>* labels) {
   CHECK_GE(contours_size, 0u);
   CHECK_NOTNULL(colors)->clear();
+  CHECK_NOTNULL(labels)->clear();
+  CHECK_EQ(colors_.size(), labels_.size());
   if (colors_.size() < contours_size) {
     colors_.reserve(contours_size);
     for (size_t i = colors_.size(); i < contours_size; ++i) {
       colors_.push_back(cv::Scalar(255 * (rand() / (1.0 + RAND_MAX)),
                                    255 * (rand() / (1.0 + RAND_MAX)),
                                    255 * (rand() / (1.0 + RAND_MAX))));
+      labels_.push_back(i);
     }
   }
   *colors = colors_;
+  *labels = labels_;
 }
 
 void DepthSegmenter::labelMap(const cv::Mat& depth_image,
-                              const cv::Mat& edge_map, cv::Mat* labeled_map) {
+                              const cv::Mat& depth_map, const cv::Mat& edge_map,
+                              cv::Mat* labeled_map,
+                              std::vector<std::vector<cv::Vec3f>>* segments) {
   CHECK(!depth_image.empty());
   CHECK_EQ(depth_image.type(), CV_32FC1);
   CHECK(!edge_map.empty());
   CHECK_EQ(edge_map.type(), CV_32FC1);
+  CHECK_EQ(depth_map.type(), CV_32FC3);
   CHECK_EQ(depth_image.size(), edge_map.size());
+  CHECK_EQ(depth_image.size(), depth_map.size());
   CHECK_NOTNULL(labeled_map);
+  CHECK_NOTNULL(segments)->clear();
 
   cv::Mat output = cv::Mat::zeros(depth_image.size(), CV_8UC3);
   switch (params_.label.method) {
@@ -656,10 +666,12 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
       cv::findContours(edge_map_8u, contours, hierarchy, CV_RETR_TREE,
                        CV_CHAIN_APPROX_SIMPLE, kContourOffset);
       cv::Mat drawing = cv::Mat::zeros(output.size(), CV_8UC3);
+
       std::vector<cv::Point> approximate_shape;
 
       std::vector<cv::Scalar> colors;
-      generateRandomColors(contours.size(), &colors);
+      std::vector<int> labels;
+      generateRandomColorsAndLabels(contours.size(), &colors, &labels);
       for (size_t i = 0u; i < contours.size(); ++i) {
         const double area = cv::contourArea(contours[i]);
         if (area < params_.label.min_size) {
@@ -667,15 +679,48 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
           if (hierarchy[i][3] == kNoParentContour) {
             // Assign black color to areas that have no parent contour.
             colors[i] = cv::Scalar(0, 0, 0);
+            labels[i] = -1;
           } else {
             // Assign the color of the parent contour.
             colors[i] = colors[hierarchy[i][3]];
+            labels[i] = labels[hierarchy[i][3]];
           }
         }
       }
-      for (size_t i = 0u; i < contours.size(); i++) {
-        drawContours(output, contours, i, colors[i], CV_FILLED);
+      cv::Mat output_labels =
+          cv::Mat(depth_image.size(), CV_32SC1, cv::Scalar(-1));
+      for (size_t i = 0u; i < contours.size(); ++i) {
+        drawContours(output, contours, i, cv::Scalar(colors[i]), CV_FILLED);
+        drawContours(output_labels, contours, i, cv::Scalar(labels[i]),
+                     CV_FILLED);
       }
+      // Create a map of all the labels.
+      std::map<size_t, size_t> labels_map;
+      size_t value = 0u;
+      for (size_t i = 0u; i < labels.size(); ++i) {
+        if (labels[i] >= 0) {
+          // Create a new map if label is not yet in keys.
+          if (labels_map.find(labels[i]) == labels_map.end()) {
+            labels_map[labels[i]] = value;
+            ++value;
+          }
+        }
+      }
+      segments->resize(labels_map.size());
+
+      for (size_t x = 0u; x < output_labels.cols; ++x) {
+        for (size_t y = 0u; y < output_labels.rows; ++y) {
+          const int32_t label = output_labels.at<int32_t>(y, x);
+          if (label < 0) {
+            continue;
+          } else {
+            // Append vectors from depth_map to vectors of segments.
+            (*segments)[labels_map.at(label)].push_back(
+                depth_map.at<cv::Vec3f>(y, x));
+          }
+        }
+      }
+      CHECK_EQ(segments->size(), labels_map.size());
       break;
     }
     case LabelMapMethod::kFloodFill: {
@@ -685,23 +730,26 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
       constexpr float kMaxBinaryValue = 1.0f;
       cv::threshold(edge_map, binary_edge_map, kEdgeMapThresholdValue,
                     kMaxBinaryValue, cv::THRESH_BINARY);
-      std::vector<std::vector<cv::Point2i>> labels;
-      findBlobs(binary_edge_map, &labels);
+      std::vector<std::vector<cv::Point2i>> labeled_segments;
+      findBlobs(binary_edge_map, &labeled_segments);
 
       std::vector<cv::Scalar> colors;
-      generateRandomColors(labels.size(), &colors);
-      // Randomly color the labels
-      for (size_t i = 0u; i < labels.size(); ++i) {
+      std::vector<int> labels;
+      generateRandomColorsAndLabels(labeled_segments.size(), &colors, &labels);
+      segments->resize(labeled_segments.size());
+      // Assign the colors and labels to the segments.
+      for (size_t i = 0u; i < labeled_segments.size(); ++i) {
         cv::Vec3b color;
-        if (labels[i].size() < params_.label.min_size) {
+        if (labeled_segments[i].size() < params_.label.min_size) {
           color = cv::Vec3b(0, 0, 0);
         } else {
           color = cv::Vec3b(colors[i][0], colors[i][1], colors[i][2]);
         }
-        for (size_t j = 0u; j < labels[i].size(); ++j) {
-          const size_t x = labels[i][j].x;
-          const size_t y = labels[i][j].y;
+        for (size_t j = 0u; j < labeled_segments[i].size(); ++j) {
+          const size_t x = labeled_segments[i][j].x;
+          const size_t y = labeled_segments[i][j].y;
           output.at<cv::Vec3b>(y, x) = color;
+          (*segments)[i].push_back(depth_map.at<cv::Vec3f>(y, x));
         }
       }
       break;
