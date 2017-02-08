@@ -121,8 +121,10 @@ class DepthSegmentationNode {
 
   void publish_segments(const std::vector<std::vector<cv::Vec3f>>& segments,
                         const ros::Time& timestamp) {
+    CHECK_GT(segments.size(), 0u);
     pcl::PointCloud<PointType>::Ptr scene_pcl(new pcl::PointCloud<PointType>);
     for (std::vector<cv::Vec3f> segment : segments) {
+      CHECK_GT(segment.size(), 0u);
       pcl::PointCloud<PointType>::Ptr segment_pcl(
           new pcl::PointCloud<PointType>);
       const unsigned char r = rand() % 255;

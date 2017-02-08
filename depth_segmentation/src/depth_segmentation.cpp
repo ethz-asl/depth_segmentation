@@ -755,6 +755,16 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
       break;
     }
   }
+  // Remove empty segments from segments vector.
+  // TODO(ff): Figure out, why there are segments of size 0.
+  for (std::vector<std::vector<cv::Vec3f>>::iterator it = segments->begin();
+       it != segments->end();) {
+    if (it->size() < params_.label.min_size) {
+      it = segments->erase(it);
+    } else {
+      ++it;
+    }
+  }
 
   if (params_.label.use_inpaint) {
     inpaintImage(depth_image, edge_map, output, &output);
