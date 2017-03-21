@@ -161,10 +161,17 @@ class DepthSegmentationNode {
                      const sensor_msgs::Image::ConstPtr& rgb_msg) {
     if (camera_info_ready_) {
       cv_bridge::CvImagePtr cv_depth_image;
-      cv_depth_image = cv_bridge::toCvCopy(
-          depth_msg, sensor_msgs::image_encodings::TYPE_16UC1);
+      cv::Mat rescaled_depth;
 
-      cv::Mat rescaled_depth(cv_depth_image->image.size(), CV_32FC1);
+      if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
+        cv_depth_image = cv_bridge::toCvCopy(
+            depth_msg, sensor_msgs::image_encodings::TYPE_16UC1);
+      } else if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_32FC1) {
+        cv_depth_image = cv_bridge::toCvCopy(
+            depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+      }
+
+      rescaled_depth = cv::Mat(cv_depth_image->image.size(), CV_32FC1);
       cv::rgbd::rescaleDepth(cv_depth_image->image, CV_32FC1, rescaled_depth);
 
       cv_bridge::CvImagePtr cv_rgb_image;
