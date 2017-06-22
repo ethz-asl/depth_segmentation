@@ -23,7 +23,7 @@
 #include "depth_segmentation/depth_segmentation.h"
 #include "depth_segmentation/ros_common.h"
 
-typedef pcl::PointXYZRGB PointType;
+typedef pcl::PointSurfel PointType;
 
 class DepthSegmentationNode {
  public:
@@ -119,25 +119,26 @@ class DepthSegmentationNode {
         depth_segmentation::kTfWorldFrame));
   }
 
-  void publish_segments(const std::vector<std::vector<cv::Vec3f>>& segments,
-                        const ros::Time& timestamp) {
+  void publish_segments(
+      const std::vector<std::vector<std::vector<cv::Vec3f>>>& segments,
+      const ros::Time& timestamp) {
     CHECK_GT(segments.size(), 0u);
     pcl::PointCloud<PointType>::Ptr scene_pcl(new pcl::PointCloud<PointType>);
-    for (std::vector<cv::Vec3f> segment : segments) {
+    for (std::vector<std::vector<cv::Vec3f>> segment : segments) {
       CHECK_GT(segment.size(), 0u);
       pcl::PointCloud<PointType>::Ptr segment_pcl(
           new pcl::PointCloud<PointType>);
-      const unsigned char r = rand() % 255;
-      const unsigned char g = rand() % 255;
-      const unsigned char b = rand() % 255;
-      for (cv::Vec3f point : segment) {
+      for (std::vector<cv::Vec3f> rgb_point_with_normals : segment) {
         PointType point_pcl;
-        point_pcl.x = point[0];
-        point_pcl.y = point[1];
-        point_pcl.z = point[2];
-        point_pcl.r = r;
-        point_pcl.g = g;
-        point_pcl.b = b;
+        point_pcl.x = rgb_point_with_normals[0][0];
+        point_pcl.y = rgb_point_with_normals[0][1];
+        point_pcl.z = rgb_point_with_normals[0][2];
+        point_pcl.normal_x = rgb_point_with_normals[1][0];
+        point_pcl.normal_y = rgb_point_with_normals[1][1];
+        point_pcl.normal_z = rgb_point_with_normals[1][2];
+        point_pcl.r = rgb_point_with_normals[2][0];
+        point_pcl.g = rgb_point_with_normals[2][1];
+        point_pcl.b = rgb_point_with_normals[2][2];
         segment_pcl->push_back(point_pcl);
         scene_pcl->push_back(point_pcl);
       }
@@ -166,7 +167,8 @@ class DepthSegmentationNode {
       if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
         cv_depth_image = cv_bridge::toCvCopy(
             depth_msg, sensor_msgs::image_encodings::TYPE_16UC1);
-      } else if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_32FC1) {
+      } else if (depth_msg->encoding ==
+                 sensor_msgs::image_encodings::TYPE_32FC1) {
         cv_depth_image = cv_bridge::toCvCopy(
             depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
       }
@@ -247,9 +249,10 @@ class DepthSegmentationNode {
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                              &edge_map);
         cv::Mat label_map(edge_map.size(), CV_32FC1);
-        std::vector<std::vector<cv::Vec3f>> segments;
-        depth_segmenter_.labelMap(rescaled_depth, depth_map, edge_map,
-                                  &label_map, &segments);
+        std::vector<std::vector<std::vector<cv::Vec3f>>> segments;
+        depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
+                                  depth_map, edge_map, normal_map, &label_map,
+                                  &segments);
         publish_segments(segments, depth_msg->header.stamp);
 
         // Update the member images to the new images.
