@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ssd_detection</name>
+  <version>0.0.0</version>
+  <description>The ssd_detection package.</description>
+
+  <maintainer email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</maintainer>
+
+  <license>BSD</license>
+
+  <author email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+
+  <depend>cv_bridge</depend>
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>opencv3_catkin</depend>
+
+</package>
