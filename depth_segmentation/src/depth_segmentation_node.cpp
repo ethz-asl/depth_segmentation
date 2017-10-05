@@ -120,25 +120,25 @@ class DepthSegmentationNode {
   }
 
   void publish_segments(
-      const std::vector<std::vector<std::vector<cv::Vec3f>>>& segments,
+      const std::vector<depth_segmentation::Segment>& segments,
       const ros::Time& timestamp) {
     CHECK_GT(segments.size(), 0u);
     pcl::PointCloud<PointType>::Ptr scene_pcl(new pcl::PointCloud<PointType>);
-    for (std::vector<std::vector<cv::Vec3f>> segment : segments) {
-      CHECK_GT(segment.size(), 0u);
+    for (depth_segmentation::Segment segment : segments) {
+      CHECK_GT(segment.points.size(), 0u);
       pcl::PointCloud<PointType>::Ptr segment_pcl(
           new pcl::PointCloud<PointType>);
-      for (std::vector<cv::Vec3f> rgb_point_with_normals : segment) {
+      for (std::size_t i = 0; i < segment.points.size(); ++i) {
         PointType point_pcl;
-        point_pcl.x = rgb_point_with_normals[0][0];
-        point_pcl.y = rgb_point_with_normals[0][1];
-        point_pcl.z = rgb_point_with_normals[0][2];
-        point_pcl.normal_x = rgb_point_with_normals[1][0];
-        point_pcl.normal_y = rgb_point_with_normals[1][1];
-        point_pcl.normal_z = rgb_point_with_normals[1][2];
-        point_pcl.r = rgb_point_with_normals[2][0];
-        point_pcl.g = rgb_point_with_normals[2][1];
-        point_pcl.b = rgb_point_with_normals[2][2];
+        point_pcl.x = segment.points[i][0];
+        point_pcl.y = segment.points[i][1];
+        point_pcl.z = segment.points[i][2];
+        point_pcl.normal_x = segment.normals[i][0];
+        point_pcl.normal_y = segment.normals[i][1];
+        point_pcl.normal_z = segment.normals[i][2];
+        point_pcl.r = segment.original_colors[i][0];
+        point_pcl.g = segment.original_colors[i][1];
+        point_pcl.b = segment.original_colors[i][2];
         segment_pcl->push_back(point_pcl);
         scene_pcl->push_back(point_pcl);
       }
@@ -249,11 +249,13 @@ class DepthSegmentationNode {
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                              &edge_map);
         cv::Mat label_map(edge_map.size(), CV_32FC1);
-        std::vector<std::vector<std::vector<cv::Vec3f>>> segments;
+        std::vector<depth_segmentation::Segment> segments;
         depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
                                   depth_map, edge_map, normal_map, &label_map,
                                   &segments);
-        publish_segments(segments, depth_msg->header.stamp);
+        if (segments.size() > 0) {
+          publish_segments(segments, depth_msg->header.stamp);
+        }
 
         // Update the member images to the new images.
         // TODO(ff): Consider only doing this, when we are far enough away
