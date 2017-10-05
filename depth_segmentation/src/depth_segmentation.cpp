@@ -640,15 +640,18 @@ void DepthSegmenter::generateRandomColorsAndLabels(
   *labels = labels_;
 }
 
-void DepthSegmenter::labelMap(const cv::Mat& depth_image,
-                              const cv::Mat& depth_map, const cv::Mat& edge_map,
-                              cv::Mat* labeled_map,
-                              std::vector<std::vector<cv::Vec3f>>* segments) {
+void DepthSegmenter::labelMap(
+    const cv::Mat& rgb_image, const cv::Mat& depth_image,
+    const cv::Mat& depth_map, const cv::Mat& edge_map,
+    const cv::Mat& normal_map, cv::Mat* labeled_map,
+    std::vector<Segment>* segments) {
+  CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
   CHECK_EQ(depth_image.type(), CV_32FC1);
   CHECK(!edge_map.empty());
   CHECK_EQ(edge_map.type(), CV_32FC1);
   CHECK_EQ(depth_map.type(), CV_32FC3);
+  CHECK_EQ(normal_map.type(), CV_32FC3);
   CHECK_EQ(depth_image.size(), edge_map.size());
   CHECK_EQ(depth_image.size(), depth_map.size());
   CHECK_NOTNULL(labeled_map);
@@ -714,9 +717,21 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
           if (label < 0) {
             continue;
           } else {
-            // Append vectors from depth_map to vectors of segments.
-            (*segments)[labels_map.at(label)].push_back(
-                depth_map.at<cv::Vec3f>(y, x));
+            // Append vectors from depth_map and normals from normal_map to
+            // vectors of segments.
+            cv::Vec3f point = depth_map.at<cv::Vec3f>(y, x);
+            cv::Vec3f normal = normal_map.at<cv::Vec3f>(y, x);
+            cv::Vec3b original_color = rgb_image.at<cv::Vec3b>(y, x);
+            cv::Vec3f color_f{float(original_color[0]),
+                              float(original_color[1]),
+                              float(original_color[2])};
+            std::vector<cv::Vec3f> rgb_point_with_normals{point, normal,
+                                                          color_f};
+            Segment& segment = (*segments)[labels_map.at(label)];
+            segment.points.push_back(point);
+            segment.normals.push_back(normal);
+            segment.original_colors.push_back(color_f);
+            segment.label.insert(label);
           }
         }
       }
@@ -748,18 +763,26 @@ void DepthSegmenter::labelMap(const cv::Mat& depth_image,
         for (size_t j = 0u; j < labeled_segments[i].size(); ++j) {
           const size_t x = labeled_segments[i][j].x;
           const size_t y = labeled_segments[i][j].y;
+          cv::Vec3f point = depth_map.at<cv::Vec3f>(y, x);
+          cv::Vec3f normal = normal_map.at<cv::Vec3f>(y, x);
+          cv::Vec3b original_color = rgb_image.at<cv::Vec3f>(y, x);
+          cv::Vec3f color_f{float(original_color[0]), float(original_color[1]),
+                            float(original_color[2])};
+          Segment& segment = (*segments)[i];
+          segment.points.push_back(point);
+          segment.normals.push_back(normal);
+          segment.original_colors.push_back(color_f);
+          segment.label.insert(i);
           output.at<cv::Vec3b>(y, x) = color;
-          (*segments)[i].push_back(depth_map.at<cv::Vec3f>(y, x));
         }
       }
       break;
     }
   }
-  // Remove empty segments from segments vector.
-  // TODO(ff): Figure out, why there are segments of size 0.
-  for (std::vector<std::vector<cv::Vec3f>>::iterator it = segments->begin();
-       it != segments->end();) {
-    if (it->size() < params_.label.min_size) {
+  // Remove small segments from segments vector.
+  std::vector<Segment>::iterator it = segments->begin();
+  while (it != segments->end()) {
+    if (it->points.size() < params_.label.min_size) {
       it = segments->erase(it);
     } else {
       ++it;

@@ -2,6 +2,7 @@
 #define DEPTH_SEGMENTATION_COMMON_H_
 
 #include <string>
+#include <vector>
 
 #include <glog/logging.h>
 #include <opencv2/highgui.hpp>
@@ -9,6 +10,13 @@
 #include <opencv2/viz/vizcore.hpp>
 
 namespace depth_segmentation {
+struct Segment {
+  std::vector<cv::Vec3f> points;
+  std::vector<cv::Vec3f> normals;
+  std::vector<cv::Vec3f> original_colors;
+  std::set<size_t> label;
+  std::set<size_t> semantic_label;
+};
 
 const static std::string kDebugWindowName = "DebugImages";
 
