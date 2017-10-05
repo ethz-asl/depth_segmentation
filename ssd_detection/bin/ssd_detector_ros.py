@@ -11,7 +11,7 @@ sys.path.insert(
 )
 sys.path.insert(1, '/opt/ros/lunar/lib/python3.6/site-packages/')
 sys.path.insert(
-    1, '/usr/local/Cellar/opencv/3.3.0_2/lib/python3.6/site-packages/')
+    1, '/usr/local/Cellar/opencv/3.3.0_3/lib/python3.6/site-packages/')
 
 sys.path.insert(1, '/usr/local/lib/python3.6/site-packages')
 
