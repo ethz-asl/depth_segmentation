@@ -138,6 +138,7 @@ class DepthSegmenter {
   void initialize();
   void dynamicReconfigureCallback(
       depth_segmentation::DepthSegmenterConfig& config, uint32_t level);
+  void computeRgbEdgeMap(const cv::Mat& rgb_image, cv::Mat* rgb_edge_map);
   void computeDepthMap(const cv::Mat& depth_image, cv::Mat* depth_map);
   void computeMaxDistanceMap(const cv::Mat& image, cv::Mat* max_distance_map);
   void computeNormalMap(const cv::Mat& depth_map, cv::Mat* normal_map);

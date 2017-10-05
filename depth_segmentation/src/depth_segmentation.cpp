@@ -193,6 +193,7 @@ void DepthSegmenter::dynamicReconfigureCallback(
                   "than 7.";
     return;
   }
+  params_.rgb_edge_map.display = config.rgb_edge_map_display;
   params_.normals.method =
       static_cast<SurfaceNormalEstimationMethod>(config.normals_method);
   params_.normals.distance_factor_threshold =
@@ -263,6 +264,15 @@ void DepthSegmenter::dynamicReconfigureCallback(
   params_.label.display = config.label_display;
 
   LOG(INFO) << "Dynamic Reconfigure Request.";
+}
+
+void DepthSegmenter::computeRgbEdgeMap(const cv::Mat& rgb_image, cv::Mat* rgb_edge_map) {
+  CHECK(!rgb_image.empty());
+  CHECK_EQ(rgb_image.type(), CV_8UC3);
+  CHECK_NOTNULL(rgb_edge_map);
+  CHECK_EQ(rgb_image.size(), rgb_edge_map->size());
+  CHECK_EQ(rgb_edge_map->type(), CV_32FC1);
+  // TODO(ff): Do something here.
 }
 
 void DepthSegmenter::computeDepthMap(const cv::Mat& depth_image,

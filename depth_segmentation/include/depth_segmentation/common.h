@@ -27,6 +27,10 @@ enum class SurfaceNormalEstimationMethod {
   kDepthWindowFilter = 3,
 };
 
+struct RgbEdgeMapParams {
+  bool display = true;
+};
+
 struct SurfaceNormalParams {
   SurfaceNormalParams() {
     CHECK_EQ(window_size % 2u, 1u);
@@ -110,6 +114,7 @@ struct Params {
   LabelMapParams label;
   MaxDistanceMapParams max_distance;
   MinConvexityMapParams min_convexity;
+  RgbEdgeMapParams rgb_edge_map;
   SurfaceNormalParams normals;
 };
 
