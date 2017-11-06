@@ -29,6 +29,12 @@ enum class SurfaceNormalEstimationMethod {
 
 struct RgbEdgeMapParams {
   bool display = true;
+  bool use_morphological_opening = true;
+  double threshold_low = 1.0;
+  double threshold_high = 80.0;
+  size_t kernel_size = 3u;
+  size_t morphological_opening_size = 2u;
+  size_t blur_filter_size = 3u;
 };
 
 struct SurfaceNormalParams {
@@ -77,6 +83,7 @@ struct MinConvexityMapParams {
 struct FinalEdgeMapParams {
   size_t morphological_opening_size = 1u;
   size_t morphological_closing_size = 1u;
+  double rgb_edge_thresh = 0.9;
   bool use_morphological_opening = true;
   bool use_morphological_closing = true;
   bool display = false;

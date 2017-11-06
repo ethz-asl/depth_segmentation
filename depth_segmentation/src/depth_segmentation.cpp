@@ -194,6 +194,14 @@ void DepthSegmenter::dynamicReconfigureCallback(
     return;
   }
   params_.rgb_edge_map.display = config.rgb_edge_map_display;
+  params_.rgb_edge_map.use_morphological_opening =
+      config.rgb_edge_map_use_morphological_opening;
+  params_.rgb_edge_map.morphological_opening_size =
+      config.rgb_edge_map_morphological_opening_size;
+  params_.rgb_edge_map.kernel_size = config.rgb_edge_map_kernel_size;
+  params_.rgb_edge_map.threshold_low = config.rgb_edge_map_threshold_low;
+  params_.rgb_edge_map.threshold_high = config.rgb_edge_map_threshold_high;
+  params_.rgb_edge_map.blur_filter_size = config.rgb_edge_map_blur_filter_size;
   params_.normals.method =
       static_cast<SurfaceNormalEstimationMethod>(config.normals_method);
   params_.normals.distance_factor_threshold =
@@ -255,6 +263,7 @@ void DepthSegmenter::dynamicReconfigureCallback(
   params_.final_edge.use_morphological_closing =
       config.final_edge_use_morphological_closing;
   params_.final_edge.display = config.final_edge_display;
+  params_.final_edge.rgb_edge_thresh = config.final_edge_rgb_edge_thresh;
 
   // Label map params.
   params_.label.method = static_cast<LabelMapMethod>(config.label_method);
@@ -266,13 +275,47 @@ void DepthSegmenter::dynamicReconfigureCallback(
   LOG(INFO) << "Dynamic Reconfigure Request.";
 }
 
-void DepthSegmenter::computeRgbEdgeMap(const cv::Mat& rgb_image, cv::Mat* rgb_edge_map) {
+void DepthSegmenter::computeRgbEdgeMap(const cv::Mat& rgb_image,
+                                       cv::Mat* rgb_edge_map) {
   CHECK(!rgb_image.empty());
   CHECK_EQ(rgb_image.type(), CV_8UC3);
   CHECK_NOTNULL(rgb_edge_map);
   CHECK_EQ(rgb_image.size(), rgb_edge_map->size());
   CHECK_EQ(rgb_edge_map->type(), CV_32FC1);
-  // TODO(ff): Do something here.
+
+  cv::Mat bw_image(rgb_image.size(), CV_8UC1);
+  cvtColor(rgb_image, bw_image, cv::COLOR_RGB2GRAY);
+  cv::Mat detected_edges;
+  // Reduce noise with a bluring kernel.
+  cv::blur(bw_image, detected_edges,
+           cv::Size(params_.rgb_edge_map.blur_filter_size,
+                    params_.rgb_edge_map.blur_filter_size));
+
+  // Canny detector
+  cv::Canny(detected_edges, detected_edges, params_.rgb_edge_map.threshold_low,
+            params_.rgb_edge_map.threshold_high,
+            params_.rgb_edge_map.kernel_size);
+  detected_edges.convertTo(detected_edges, CV_32FC1);
+  *rgb_edge_map = cv::Scalar::all(0);
+  static const cv::Mat ones_image = cv::Mat::ones(rgb_image.size(), CV_32FC1);
+  *rgb_edge_map = ones_image.mul(detected_edges);
+  // ones_image.copyTo(*rgb_edge_map, detected_edges);
+  // detected_edges.copyTo(*rgb_edge_map);
+  if (params_.rgb_edge_map.use_morphological_opening) {
+    cv::Mat element = cv::getStructuringElement(
+        cv::MORPH_RECT,
+        cv::Size(2u * params_.rgb_edge_map.morphological_opening_size + 1u,
+                 2u * params_.rgb_edge_map.morphological_opening_size + 1u),
+        cv::Point(params_.rgb_edge_map.morphological_opening_size,
+                  params_.rgb_edge_map.morphological_opening_size));
+    cv::morphologyEx(*rgb_edge_map, *rgb_edge_map, cv::MORPH_CLOSE, element);
+  }
+  if (params_.rgb_edge_map.display) {
+    static const std::string kWindowName = "RGB Edge Map";
+    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    cv::imshow(kWindowName, *rgb_edge_map);
+    cv::waitKey(1);
+  }
 }
 
 void DepthSegmenter::computeDepthMap(const cv::Mat& depth_image,
@@ -409,9 +452,9 @@ void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
   }
 }
 
-void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
-                                            const cv::Mat& normal_map,
-                                            cv::Mat* min_convexity_map) {
+void DepthSegmenter::computeMinConvexityMap(
+    const cv::Mat& depth_map, const cv::Mat& normal_map,
+    cv::Mat* min_convexity_map, cv::Mat* min_convexity_map_thresholded) {
   CHECK(!depth_map.empty());
   CHECK(!normal_map.empty());
   CHECK_EQ(depth_map.type(), CV_32FC3);
@@ -506,9 +549,11 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
 
   if (params_.min_convexity.use_threshold) {
     constexpr float kMaxBinaryValue = 1.0f;
-    cv::threshold(*min_convexity_map, *min_convexity_map,
+    cv::threshold(*min_convexity_map, *min_convexity_map_thresholded,
                   params_.min_convexity.threshold, kMaxBinaryValue,
                   cv::THRESH_BINARY);
+  } else {
+    *min_convexity_map_thresholded = *min_convexity_map;
   }
 
   if (params_.min_convexity.use_morphological_opening) {
@@ -518,26 +563,32 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
                  2u * params_.min_convexity.morphological_opening_size + 1u),
         cv::Point(params_.min_convexity.morphological_opening_size,
                   params_.min_convexity.morphological_opening_size));
-    cv::morphologyEx(*min_convexity_map, *min_convexity_map, cv::MORPH_OPEN,
-                     element);
+    cv::morphologyEx(*min_convexity_map_thresholded,
+                     *min_convexity_map_thresholded, cv::MORPH_OPEN, element);
+    // cv::morphologyEx(*min_convexity_map, *min_convexity_map, cv::MORPH_OPEN,
+    //                  element);
   }
 
   if (params_.min_convexity.display) {
-    static const std::string kWindowName = "MinConcavityMap";
+    static const std::string kWindowName = "MinConvexityMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     cv::imshow(kWindowName, *min_convexity_map);
     cv::waitKey(1);
   }
 }
 
-void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
-                                         const cv::Mat& distance_map,
-                                         cv::Mat* edge_map) {
+void DepthSegmenter::computeFinalEdgeMap(
+    const cv::Mat& convexity_map, const cv::Mat& convexity_map_thresholded,
+    const cv::Mat& distance_map, const cv::Mat& rgb_edge_map,
+    cv::Mat* edge_map) {
   CHECK(!convexity_map.empty());
   CHECK(!distance_map.empty());
+  CHECK(!rgb_edge_map.empty());
   CHECK_EQ(convexity_map.type(), CV_32FC1);
   CHECK_EQ(distance_map.type(), CV_32FC1);
+  CHECK_EQ(rgb_edge_map.type(), CV_32FC1);
   CHECK_EQ(convexity_map.size(), distance_map.size());
+  CHECK_EQ(convexity_map.size(), rgb_edge_map.size());
   CHECK_NOTNULL(edge_map);
   if (params_.final_edge.use_morphological_opening) {
     cv::Mat element = cv::getStructuringElement(
@@ -547,6 +598,8 @@ void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
         cv::Point(params_.final_edge.morphological_opening_size,
                   params_.final_edge.morphological_opening_size));
 
+    cv::morphologyEx(convexity_map_thresholded, convexity_map_thresholded,
+                     cv::MORPH_OPEN, element);
     cv::morphologyEx(convexity_map, convexity_map, cv::MORPH_OPEN, element);
   }
   if (params_.final_edge.use_morphological_closing) {
@@ -557,9 +610,52 @@ void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
         cv::Point(params_.final_edge.morphological_closing_size,
                   params_.final_edge.morphological_closing_size));
     cv::morphologyEx(distance_map, distance_map, cv::MORPH_CLOSE, element);
+    // cv::morphologyEx(rgb_edge_map, rgb_edge_map, cv::MORPH_CLOSE, element);
   }
+  cv::threshold(rgb_edge_map, rgb_edge_map, params_.final_edge.rgb_edge_thresh,
+                1.0, cv::THRESH_BINARY);
+  cv::Mat rgb_edge_map_inverse;
+  cv::Mat rgb_edge_map_on_face = convexity_map.mul(rgb_edge_map);
+  cv::threshold(rgb_edge_map_on_face, rgb_edge_map_on_face,
+                params_.final_edge.rgb_edge_thresh, 1.0, cv::THRESH_BINARY);
+  static const std::string kWindowNameT = "rgbedgesonface";
+  cv::namedWindow(kWindowNameT, cv::WINDOW_AUTOSIZE);
+  imshow(kWindowNameT, rgb_edge_map_on_face);
+  cv::waitKey(1);
+  cv::Mat rgb_edge_map_not_on_face = rgb_edge_map - rgb_edge_map_on_face;
+  cv::threshold(rgb_edge_map_not_on_face, rgb_edge_map_not_on_face, 0.5, 1.0,
+                cv::THRESH_BINARY);
+  // if (true) {
+  //   cv::Mat element = cv::getStructuringElement(
+  //       cv::MORPH_ELLIPSE, cv::Size(2u * 1 + 1u, 2u * 1 + 1u),
+  //       cv::Point(params_.final_edge.morphological_closing_size,
+  //                 params_.final_edge.morphological_closing_size));
+  //   cv::dilate(rgb_edge_map_not_on_face, rgb_edge_map_not_on_face, element);
+  // }
+  static const std::string kWindowNameTT = "rgbedgesnotonface";
+  cv::namedWindow(kWindowNameTT, cv::WINDOW_AUTOSIZE);
+  imshow(kWindowNameTT, rgb_edge_map_not_on_face);
+  cv::waitKey(1);
+  // cv::bitwise_not(rgb_edge_map_not_on_face, rgb_edge_map_inverse);
+  // cv::bitwise_and(convexity_map, rgb_edge_map_inverse, convexity_map);
+  cv::Mat edges = distance_map + rgb_edge_map_not_on_face;
+  std::vector<cv::Vec4i> lines;
+  cv::Mat gray_edge;
+  edges.convertTo(gray_edge, CV_8UC1);
+  cv::HoughLinesP(gray_edge, lines, 2, 5 * CV_PI / 180, 50, 100, 10);
+  for (size_t i = 0; i < lines.size(); i++) {
+    cv::Vec4i l = lines[i];
+    cv::line(edges, cv::Point(l[0], l[1]),
+             cv::Point(l[2], l[3]), cv::Scalar(1), 5, CV_AA);
+  }
+  static const std::string kWindowNameTTTT = "rgbedgesnotonface_after";
+  cv::namedWindow(kWindowNameTTTT, cv::WINDOW_AUTOSIZE);
+  imshow(kWindowNameTTTT, edges);
+  cv::waitKey(1);
 
-  *edge_map = convexity_map - distance_map;
+  *edge_map =
+      convexity_map_thresholded - edges;
+  // cv::bitwise_not(rgb_edge_map_not_on_face + distance_map, *edge_map);
   // TODO(ff): Perform morphological operations (also) on edge_map.
   if (params_.final_edge.display) {
     static const std::string kWindowName = "FinalEdgeMap";
@@ -650,11 +746,11 @@ void DepthSegmenter::generateRandomColorsAndLabels(
   *labels = labels_;
 }
 
-void DepthSegmenter::labelMap(
-    const cv::Mat& rgb_image, const cv::Mat& depth_image,
-    const cv::Mat& depth_map, const cv::Mat& edge_map,
-    const cv::Mat& normal_map, cv::Mat* labeled_map,
-    std::vector<Segment>* segments) {
+void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
+                              const cv::Mat& depth_image,
+                              const cv::Mat& depth_map, const cv::Mat& edge_map,
+                              const cv::Mat& normal_map, cv::Mat* labeled_map,
+                              std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
   CHECK_EQ(depth_image.type(), CV_32FC1);
@@ -667,6 +763,11 @@ void DepthSegmenter::labelMap(
   CHECK_NOTNULL(labeled_map);
   CHECK_NOTNULL(segments)->clear();
 
+  static const std::string kWindowName = "FinalEdgeMapCopied";
+  cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+  imshow(kWindowName, edge_map);
+  cv::waitKey(1);
+
   cv::Mat output = cv::Mat::zeros(depth_image.size(), CV_8UC3);
   switch (params_.label.method) {
     case LabelMapMethod::kContour: {
@@ -675,7 +776,7 @@ void DepthSegmenter::labelMap(
       std::vector<cv::Vec4i> hierarchy;
       cv::Mat edge_map_8u;
       edge_map.convertTo(edge_map_8u, CV_8U);
-      static const cv::Point kContourOffset = cv::Point(0, 0);
+      static const cv::Point kContourOffset = cv::Point(1, 1);
       cv::findContours(edge_map_8u, contours, hierarchy, CV_RETR_TREE,
                        CV_CHAIN_APPROX_SIMPLE, kContourOffset);
       cv::Mat drawing = cv::Mat::zeros(output.size(), CV_8UC3);
@@ -751,7 +852,7 @@ void DepthSegmenter::labelMap(
     case LabelMapMethod::kFloodFill: {
       // TODO(ff): Move to method.
       cv::Mat binary_edge_map;
-      constexpr float kEdgeMapThresholdValue = 0.0f;
+      constexpr float kEdgeMapThresholdValue = 0.5f;
       constexpr float kMaxBinaryValue = 1.0f;
       cv::threshold(edge_map, binary_edge_map, kEdgeMapThresholdValue,
                     kMaxBinaryValue, cv::THRESH_BINARY);

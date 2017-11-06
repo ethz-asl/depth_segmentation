@@ -209,8 +209,10 @@ TEST_F(DepthSegmentationTest, testConvexity) {
     }
   }
   cv::Mat min_convexity_map(image_size, CV_32FC1);
+  cv::Mat min_convexity_map(image_size, CV_32FC1);
   depth_segmenter_.computeMinConvexityMap(depth_map, concave_normals,
-                                          &min_convexity_map);
+                                          &min_convexity_map,
+                                          &min_convexity_map_thresholded);
   static const std::string kDepthWindowName = "depthTest";
   cv::namedWindow(kDepthWindowName, cv::WINDOW_AUTOSIZE);
   cv::imshow(kDepthWindowName, depth_map);

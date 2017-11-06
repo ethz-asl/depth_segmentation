@@ -242,16 +242,19 @@ class DepthSegmentationNode {
         // Compute minimum convexity map.
         cv::Mat convexity_map(depth_camera_.getWidth(),
                               depth_camera_.getHeight(), CV_32FC1);
-        depth_segmenter_.computeMinConvexityMap(depth_map, normal_map,
-                                                &convexity_map);
+        cv::Mat convexity_map_thresholded(depth_camera_.getWidth(),
+                                          depth_camera_.getHeight(), CV_32FC1);
+        depth_segmenter_.computeMinConvexityMap(
+            depth_map, normal_map, &convexity_map, &convexity_map_thresholded);
         // TODO(ff): change to rgb_camera_
-        cv::Mat rgb_edge_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
-                         CV_32FC1);
+        cv::Mat rgb_edge_map(depth_camera_.getWidth(),
+                             depth_camera_.getHeight(), CV_32FC1);
         depth_segmenter_.computeRgbEdgeMap(cv_rgb_image->image, &rgb_edge_map);
         cv::Mat edge_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
                          CV_32FC1);
-        depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
-                                             &edge_map);
+        depth_segmenter_.computeFinalEdgeMap(
+            convexity_map, convexity_map_thresholded, distance_map,
+            rgb_edge_map, &edge_map);
         cv::Mat label_map(edge_map.size(), CV_32FC1);
         std::vector<depth_segmentation::Segment> segments;
         depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
