@@ -792,7 +792,9 @@ void DepthSegmenter::labelMap(
   if (params_.label.use_inpaint) {
     inpaintImage(depth_image, edge_map, output, &output);
   }
-
+  cv::Mat r = cv::Mat::zeros(output.size(), output.type());
+  output.copyTo(r, depth_image == depth_image);
+  output = r;
   if (params_.label.display) {
     static const std::string kWindowName = "LabelMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
