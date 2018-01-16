@@ -253,6 +253,9 @@ class DepthSegmentationNode {
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                              &edge_map);
         cv::Mat label_map(edge_map.size(), CV_32FC1);
+        cv::Mat r = cv::Mat::zeros(edge_map.size(), edge_map.type());
+        edge_map.copyTo(r, rescaled_depth == rescaled_depth);
+        edge_map = r;
         std::vector<depth_segmentation::Segment> segments;
         depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
                                   depth_map, edge_map, normal_map, &label_map,
