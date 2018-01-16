@@ -208,11 +208,15 @@ class DepthSegmentationNode {
 #endif  // DISPLAY_DEPTH_IMAGES
 
         // Compute transform from tracker.
-        if (camera_tracker_.computeTransform(bw_image, rescaled_depth, mask)) {
-          publish_tf(camera_tracker_.getWorldTransform(),
-                     depth_msg->header.stamp);
-        } else {
-          LOG(ERROR) << "Failed to compute Transform.";
+        constexpr bool kUseTracker = false;
+        if (kUseTracker) {
+          if (camera_tracker_.computeTransform(bw_image, rescaled_depth,
+                                               mask)) {
+            publish_tf(camera_tracker_.getWorldTransform(),
+                       depth_msg->header.stamp);
+          } else {
+            LOG(ERROR) << "Failed to compute Transform.";
+          }
         }
         cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
                           CV_32FC3);
