@@ -27,13 +27,6 @@ class SubThenFilter:
             print(e)
 
         cv_image = np.nan_to_num(cv_image)
-        # cv2.normalize(cv_image, cv_image, 16000, 0, cv2.NORM_MINMAX)
-        # img8 = (cv_image / 256).astype('uint8')
-        # ret, mask = cv2.threshold(img8, 1, 255, cv2.THRESH_BINARY_INV)
-
-        # dst = cv2.inpaint(img8, mask, 3, cv2.INPAINT_NS)
-        # dst = cv2.inpaint(img8, mask_inv, 3, cv2.INPAINT_TELEA)
-        # cv_image = (dst * 256).astype('uint16')
 
         kernel = np.ones((3, 3), np.uint8)
         cv_image = cv2.dilate(cv_image, kernel, 3)

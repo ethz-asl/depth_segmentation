@@ -640,11 +640,11 @@ void DepthSegmenter::generateRandomColorsAndLabels(
   *labels = labels_;
 }
 
-void DepthSegmenter::labelMap(
-    const cv::Mat& rgb_image, const cv::Mat& depth_image,
-    const cv::Mat& depth_map, const cv::Mat& edge_map,
-    const cv::Mat& normal_map, cv::Mat* labeled_map,
-    std::vector<Segment>* segments) {
+void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
+                              const cv::Mat& depth_image,
+                              const cv::Mat& depth_map, const cv::Mat& edge_map,
+                              const cv::Mat& normal_map, cv::Mat* labeled_map,
+                              std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
   CHECK_EQ(depth_image.type(), CV_32FC1);
@@ -792,9 +792,9 @@ void DepthSegmenter::labelMap(
   if (params_.label.use_inpaint) {
     inpaintImage(depth_image, edge_map, output, &output);
   }
-  cv::Mat r = cv::Mat::zeros(output.size(), output.type());
-  output.copyTo(r, depth_image == depth_image);
-  output = r;
+  cv::Mat remove_no_values = cv::Mat::zeros(output.size(), output.type());
+  output.copyTo(remove_no_values, depth_image == depth_image);
+  output = remove_no_values;
   if (params_.label.display) {
     static const std::string kWindowName = "LabelMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
