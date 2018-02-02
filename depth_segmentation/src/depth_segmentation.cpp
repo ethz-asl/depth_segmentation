@@ -200,6 +200,22 @@ void DepthSegmenter::dynamicReconfigureCallback(
   params_.normals.window_size = config.normals_window_size;
   params_.normals.display = config.normals_display;
 
+  // Depth discontinuity map params.
+  if (config.depth_discontinuity_kernel_size % 2u != 1u) {
+    // Resetting the config value to its previous value.
+    config.depth_discontinuity_kernel_size =
+        params_.depth_discontinuity.kernel_size;
+    LOG(ERROR) << "Set the depth discontinuity kernel size to an odd number.";
+    return;
+  }
+  params_.depth_discontinuity.use_discontinuity =
+      config.depth_discontinuity_use_depth_discontinuity;
+  params_.depth_discontinuity.kernel_size =
+      config.depth_discontinuity_kernel_size;
+  params_.depth_discontinuity.discontinuity_threshold =
+      config.depth_discontinuity_threshold;
+  params_.depth_discontinuity.display = config.depth_discontinuity_display;
+
   // Max distance map params.
   if (config.max_distance_window_size % 2u != 1u) {
     // Resetting the config value to its previous value.
@@ -275,6 +291,48 @@ void DepthSegmenter::computeDepthMap(const cv::Mat& depth_image,
   CHECK(!depth_camera_.getCameraMatrix().empty());
 
   cv::rgbd::depthTo3d(depth_image, depth_camera_.getCameraMatrix(), *depth_map);
+}
+
+void DepthSegmenter::computeDepthDiscontinuityMap(
+    const cv::Mat& depth_image, cv::Mat* depth_discontinuity_map) {
+  CHECK(!depth_image.empty());
+  CHECK_EQ(depth_image.type(), CV_32FC1);
+  CHECK_NOTNULL(depth_discontinuity_map);
+  CHECK_EQ(depth_discontinuity_map->type(), CV_32FC1);
+
+  constexpr size_t kMaxValue = 1u;
+  constexpr double kNanThreshold = 0.0;
+
+  cv::Size image_size(depth_image.cols, depth_image.rows);
+  cv::Mat element = cv::getStructuringElement(
+      cv::MORPH_RECT, cv::Size(params_.depth_discontinuity.kernel_size,
+                               params_.depth_discontinuity.kernel_size));
+
+  cv::Mat depth_without_nans(image_size, CV_32FC1);
+  cv::threshold(depth_image, depth_without_nans, kNanThreshold, kMaxValue,
+                cv::THRESH_TOZERO);
+
+  cv::Mat dilate_image(image_size, CV_32FC1);
+  cv::dilate(depth_without_nans, dilate_image, element);
+  dilate_image -= depth_without_nans;
+
+  cv::Mat erode_image(image_size, CV_32FC1);
+  cv::erode(depth_without_nans, erode_image, element);
+  erode_image = depth_without_nans - erode_image;
+
+  cv::Mat max_image(image_size, CV_32FC1);
+  cv::max(dilate_image, erode_image, max_image);
+
+  cv::threshold(max_image, *depth_discontinuity_map,
+                params_.depth_discontinuity.discontinuity_threshold, kMaxValue,
+                cv::THRESH_BINARY);
+
+  if (params_.depth_discontinuity.display) {
+    static const std::string kWindowName = "DepthDiscontinuityMap";
+    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    cv::imshow(kWindowName, *depth_discontinuity_map);
+    cv::waitKey(1);
+  }
 }
 
 void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
@@ -522,12 +580,16 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
 
 void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
                                          const cv::Mat& distance_map,
+                                         const cv::Mat& discontinuity_map,
                                          cv::Mat* edge_map) {
   CHECK(!convexity_map.empty());
   CHECK(!distance_map.empty());
+  CHECK(!discontinuity_map.empty());
   CHECK_EQ(convexity_map.type(), CV_32FC1);
   CHECK_EQ(distance_map.type(), CV_32FC1);
+  CHECK_EQ(discontinuity_map.type(), CV_32FC1);
   CHECK_EQ(convexity_map.size(), distance_map.size());
+  CHECK_EQ(convexity_map.size(), discontinuity_map.size());
   CHECK_NOTNULL(edge_map);
   if (params_.final_edge.use_morphological_opening) {
     cv::Mat element = cv::getStructuringElement(
@@ -547,9 +609,18 @@ void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
         cv::Point(params_.final_edge.morphological_closing_size,
                   params_.final_edge.morphological_closing_size));
     cv::morphologyEx(distance_map, distance_map, cv::MORPH_CLOSE, element);
+
+    // TODO(ntonci): Consider making a separate parameter for discontinuity_map.
+    cv::morphologyEx(discontinuity_map, discontinuity_map, cv::MORPH_CLOSE,
+                     element);
   }
 
-  *edge_map = convexity_map - distance_map;
+  cv::Mat distance_discontinuity_map(
+      cv::Size(distance_map.cols, distance_map.rows), CV_32FC1);
+  cv::threshold(distance_map + discontinuity_map, distance_discontinuity_map,
+                1.0, 1.0, cv::THRESH_TRUNC);
+  *edge_map = convexity_map - distance_discontinuity_map;
+
   // TODO(ff): Perform morphological operations (also) on edge_map.
   if (params_.final_edge.display) {
     static const std::string kWindowName = "FinalEdgeMap";
@@ -640,11 +711,11 @@ void DepthSegmenter::generateRandomColorsAndLabels(
   *labels = labels_;
 }
 
-void DepthSegmenter::labelMap(
-    const cv::Mat& rgb_image, const cv::Mat& depth_image,
-    const cv::Mat& depth_map, const cv::Mat& edge_map,
-    const cv::Mat& normal_map, cv::Mat* labeled_map,
-    std::vector<Segment>* segments) {
+void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
+                              const cv::Mat& depth_image,
+                              const cv::Mat& depth_map, const cv::Mat& edge_map,
+                              const cv::Mat& normal_map, cv::Mat* labeled_map,
+                              std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
   CHECK_EQ(depth_image.type(), CV_32FC1);

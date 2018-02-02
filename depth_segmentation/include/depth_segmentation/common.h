@@ -58,6 +58,14 @@ struct MaxDistanceMapParams {
   double sensor_min_distance = 0.2;
 };
 
+struct DepthDiscontinuityMapParams {
+  DepthDiscontinuityMapParams() { CHECK_EQ(kernel_size % 2u, 1u); }
+  bool use_discontinuity = true;
+  size_t kernel_size = 3u;
+  double discontinuity_threshold = 0.02;
+  bool display = false;
+};
+
 struct MinConvexityMapParams {
   MinConvexityMapParams() { CHECK_EQ(window_size % 2u, 1u); }
   size_t morphological_opening_size = 1u;
@@ -108,6 +116,7 @@ struct IsNotNan {
 struct Params {
   FinalEdgeMapParams final_edge;
   LabelMapParams label;
+  DepthDiscontinuityMapParams depth_discontinuity;
   MaxDistanceMapParams max_distance;
   MinConvexityMapParams min_convexity;
   SurfaceNormalParams normals;
@@ -290,6 +299,6 @@ void computeOwnNormals(const SurfaceNormalParams& params,
     }
   }
 }
-}  // depth_segmentation
+}  // namespace depth_segmentation
 
 #endif  // DEPTH_SEGMENTATION_COMMON_H_
