@@ -208,11 +208,15 @@ class DepthSegmentationNode {
 #endif  // DISPLAY_DEPTH_IMAGES
 
         // Compute transform from tracker.
-        if (camera_tracker_.computeTransform(bw_image, rescaled_depth, mask)) {
-          publish_tf(camera_tracker_.getWorldTransform(),
-                     depth_msg->header.stamp);
-        } else {
-          LOG(ERROR) << "Failed to compute Transform.";
+        constexpr bool kUseTracker = false;
+        if (kUseTracker) {
+          if (camera_tracker_.computeTransform(bw_image, rescaled_depth,
+                                               mask)) {
+            publish_tf(camera_tracker_.getWorldTransform(),
+                       depth_msg->header.stamp);
+          } else {
+            LOG(ERROR) << "Failed to compute Transform.";
+          }
         }
         cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
                           CV_32FC3);
@@ -249,6 +253,10 @@ class DepthSegmentationNode {
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                              &edge_map);
         cv::Mat label_map(edge_map.size(), CV_32FC1);
+        cv::Mat remove_no_values =
+            cv::Mat::zeros(edge_map.size(), edge_map.type());
+        edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
+        edge_map = remove_no_values;
         std::vector<depth_segmentation::Segment> segments;
         depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
                                   depth_map, edge_map, normal_map, &label_map,
