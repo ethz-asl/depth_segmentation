@@ -62,7 +62,7 @@ struct DepthDiscontinuityMapParams {
   DepthDiscontinuityMapParams() { CHECK_EQ(kernel_size % 2u, 1u); }
   bool use_discontinuity = true;
   size_t kernel_size = 3u;
-  double discontinuity_threshold = 0.02;
+  double discontinuity_ratio = 0.05;
   bool display = false;
 };
 

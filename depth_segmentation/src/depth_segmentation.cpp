@@ -212,8 +212,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
       config.depth_discontinuity_use_depth_discontinuity;
   params_.depth_discontinuity.kernel_size =
       config.depth_discontinuity_kernel_size;
-  params_.depth_discontinuity.discontinuity_threshold =
-      config.depth_discontinuity_threshold;
+  params_.depth_discontinuity.discontinuity_ratio =
+      config.depth_discontinuity_ratio;
   params_.depth_discontinuity.display = config.depth_discontinuity_display;
 
   // Max distance map params.
@@ -323,8 +323,11 @@ void DepthSegmenter::computeDepthDiscontinuityMap(
   cv::Mat max_image(image_size, CV_32FC1);
   cv::max(dilate_image, erode_image, max_image);
 
-  cv::threshold(max_image, *depth_discontinuity_map,
-                params_.depth_discontinuity.discontinuity_threshold, kMaxValue,
+  cv::Mat ratio_image(image_size, CV_32FC1);
+  cv::divide(max_image, depth_without_nans, ratio_image);
+
+  cv::threshold(ratio_image, *depth_discontinuity_map,
+                params_.depth_discontinuity.discontinuity_ratio, kMaxValue,
                 cv::THRESH_BINARY);
 
   if (params_.depth_discontinuity.display) {
