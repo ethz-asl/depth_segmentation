@@ -223,7 +223,7 @@ class DepthSegmentationNode {
         depth_segmenter_.computeDepthMap(rescaled_depth, &depth_map);
 
         // Compute normal map.
-        cv::Mat normal_map(depth_map.size(), CV_32FC3);
+        cv::Mat normal_map(depth_map.size(), CV_32FC3, 0.0f);
         if (params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
             params_.normals.method ==
