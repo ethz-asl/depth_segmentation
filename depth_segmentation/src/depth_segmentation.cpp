@@ -741,19 +741,19 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       cv::Mat edge_map_8u;
       edge_map.convertTo(edge_map_8u, CV_8U);
       static const cv::Point kContourOffset = cv::Point(0, 0);
-      cv::findContours(edge_map_8u, contours, hierarchy, CV_RETR_TREE,
+      cv::findContours(edge_map_8u, contours, hierarchy,
+                       cv::RETR_TREE, /*cv::RETR_CCOMP*/
                        CV_CHAIN_APPROX_SIMPLE, kContourOffset);
-      cv::Mat drawing = cv::Mat::zeros(output.size(), CV_8UC3);
 
-      std::vector<cv::Point> approximate_shape;
 
       std::vector<cv::Scalar> colors;
       std::vector<int> labels;
       generateRandomColorsAndLabels(contours.size(), &colors, &labels);
       for (size_t i = 0u; i < contours.size(); ++i) {
         const double area = cv::contourArea(contours[i]);
-        if (area < params_.label.min_size) {
-          constexpr int kNoParentContour = -1;
+        constexpr bool kContourIsClosed = true;
+        if (area < params_.label.min_size ||
+            cv::arcLength(contours[i], kContourIsClosed) >= 0.3 * area) {
           if (hierarchy[i][3] == kNoParentContour) {
             // Assign black color to areas that have no parent contour.
             colors[i] = cv::Scalar(0, 0, 0);
@@ -912,6 +912,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     cv::waitKey(1);
   }
   *labeled_map = output;
-}
+}  // namespace depth_segmentation
 
 }  // namespace depth_segmentation
