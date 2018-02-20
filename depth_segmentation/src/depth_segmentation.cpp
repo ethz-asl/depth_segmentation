@@ -1,6 +1,7 @@
 #include "depth_segmentation/depth_segmentation.h"
 
 #include <algorithm>
+#include <limits>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -787,7 +788,42 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
 
       for (size_t x = 0u; x < output_labels.cols; ++x) {
         for (size_t y = 0u; y < output_labels.rows; ++y) {
-          const int32_t label = output_labels.at<int32_t>(y, x);
+          int32_t label = output_labels.at<int32_t>(y, x);
+          // Check if edge point and assign the nearest neighbor
+          // label.
+          const bool is_edge_point = edge_map.at<float>(y, x) == 0.0 &&
+                                     depth_image.at<float>(y, x) > 0.0;
+          if (is_edge_point) {
+            const cv::Vec3f edge_point = depth_map.at<cv::Vec3f>(y, x);
+            constexpr int filter_size = 5u;
+            double min_dist = std::numeric_limits<double>::max();
+            for (int i = -filter_size / 2; i <= filter_size / 2; ++i) {
+              if (static_cast<int>(x) + i < 0) {
+                continue;
+              }
+              if (static_cast<int>(x) + i >= output_labels.cols) {
+                break;
+              }
+              for (int j = -filter_size / 2; j <= filter_size / 2; ++j) {
+                if (static_cast<int>(y) + j < 0 || (i == 0 && j == 0)) {
+                  continue;
+                }
+                if (static_cast<int>(y) + j >= output_labels.rows) {
+                  break;
+                }
+                const cv::Vec3f filter_point =
+                    depth_map.at<cv::Vec3f>(y + j, x + i);
+                double dist = cv::norm(edge_point - filter_point);
+                int label_tmp = output_labels.at<int32_t>(y + j, x + i);
+                if (dist < min_dist && label_tmp > 0) {
+                  min_dist = dist;
+                  label = label_tmp;
+                  output.at<cv::Vec3b>(y, x) = cv::Vec3b(
+                      colors[label][0], colors[label][1], colors[label][2]);
+                }
+              }
+            }
+          }
           if (label < 0) {
             continue;
           } else {
