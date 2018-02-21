@@ -751,6 +751,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       generateRandomColorsAndLabels(contours.size(), &colors, &labels);
       for (size_t i = 0u; i < contours.size(); ++i) {
         const double area = cv::contourArea(contours[i]);
+        constexpr int kNoParentContour = -1;
         constexpr bool kContourIsClosed = true;
         if (area < params_.label.min_size ||
             cv::arcLength(contours[i], kContourIsClosed) >= 0.3 * area) {
