@@ -754,7 +754,8 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
         constexpr int kNoParentContour = -1;
         constexpr bool kContourIsClosed = true;
         if (area < params_.label.min_size ||
-            cv::arcLength(contours[i], kContourIsClosed) >= 0.3 * area) {
+            (cv::arcLength(contours[i], kContourIsClosed) >= 0.3 * area &&
+             hierarchy[i][2] == -1)) {
           if (hierarchy[i][3] == kNoParentContour) {
             // Assign black color to areas that have no parent contour.
             colors[i] = cv::Scalar(0, 0, 0);
@@ -903,9 +904,9 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   if (params_.label.use_inpaint) {
     inpaintImage(depth_image, edge_map, output, &output);
   }
-  cv::Mat remove_no_values = cv::Mat::zeros(output.size(), output.type());
-  output.copyTo(remove_no_values, depth_image == depth_image);
-  output = remove_no_values;
+  // cv::Mat remove_no_values = cv::Mat::zeros(output.size(), output.type());
+  // output.copyTo(remove_no_values, depth_image == depth_image);
+  // output = remove_no_values;
   if (params_.label.display) {
     static const std::string kWindowName = "LabelMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
