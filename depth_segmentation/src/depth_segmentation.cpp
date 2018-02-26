@@ -744,8 +744,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       static const cv::Point kContourOffset = cv::Point(0, 0);
       cv::findContours(edge_map_8u, contours, hierarchy,
                        cv::RETR_TREE, /*cv::RETR_CCOMP*/
-                       CV_CHAIN_APPROX_SIMPLE, kContourOffset);
-
+                       CV_CHAIN_APPROX_NONE, kContourOffset);
 
       std::vector<cv::Scalar> colors;
       std::vector<int> labels;
