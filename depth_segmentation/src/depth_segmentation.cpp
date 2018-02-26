@@ -705,9 +705,10 @@ void DepthSegmenter::generateRandomColorsAndLabels(
   if (colors_.size() < contours_size) {
     colors_.reserve(contours_size);
     for (size_t i = colors_.size(); i < contours_size; ++i) {
-      colors_.push_back(cv::Scalar(255 * (rand() / (1.0 + RAND_MAX)),
-                                   255 * (rand() / (1.0 + RAND_MAX)),
-                                   255 * (rand() / (1.0 + RAND_MAX))));
+      colors_.push_back(
+          cv::Scalar(255 * (rand() / static_cast<float>(RAND_MAX)),
+                     255 * (rand() / static_cast<float>(RAND_MAX)),
+                     255 * (rand() / static_cast<float>(RAND_MAX))));
       labels_.push_back(i);
     }
   }
