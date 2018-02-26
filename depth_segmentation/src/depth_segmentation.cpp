@@ -753,12 +753,13 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
         const double area = cv::contourArea(contours[i]);
         constexpr int kNoParentContour = -1;
         constexpr bool kContourIsClosed = true;
-        if (area < params_.label.min_size ||
-            cv::arcLength(contours[i], kContourIsClosed) >= 0.3 * area) {
+        if (area < params_.label.min_size) {
           if (hierarchy[i][3] == kNoParentContour) {
             // Assign black color to areas that have no parent contour.
             colors[i] = cv::Scalar(0, 0, 0);
             labels[i] = -1;
+            drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 2, 8,
+                         hierarchy);
           } else {
             // Assign the color of the parent contour.
             colors[i] = colors[hierarchy[i][3]];
@@ -767,12 +768,21 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
         }
       }
       cv::Mat output_labels =
-          cv::Mat(depth_image.size(), CV_32SC1, cv::Scalar(-1));
+          cv::Mat(depth_image.size(), CV_32SC1, cv::Scalar(0));
       for (size_t i = 0u; i < contours.size(); ++i) {
-        drawContours(output, contours, i, cv::Scalar(colors[i]), CV_FILLED);
+        drawContours(output, contours, i, cv::Scalar(colors[i]), CV_FILLED, 8,
+                     hierarchy);
         drawContours(output_labels, contours, i, cv::Scalar(labels[i]),
-                     CV_FILLED);
+                     CV_FILLED, 8, hierarchy);
+
+        drawContours(output, contours, i, cv::Scalar(0, 0, 0), 2, 8, hierarchy);
+        drawContours(output_labels, contours, i, cv::Scalar(-1), 2, 8,
+                     hierarchy);
+        drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 2, 8, hierarchy);
       }
+
+      output.setTo(cv::Scalar(0, 0, 0), edge_map_8u == 0u);
+      output_labels.setTo(-1, edge_map_8u == 0u);
       // Create a map of all the labels.
       std::map<size_t, size_t> labels_map;
       size_t value = 0u;
@@ -790,22 +800,26 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       for (size_t x = 0u; x < output_labels.cols; ++x) {
         for (size_t y = 0u; y < output_labels.rows; ++y) {
           int32_t label = output_labels.at<int32_t>(y, x);
-          // Check if edge point and assign the nearest neighbor
-          // label.
-          const bool is_edge_point = edge_map.at<float>(y, x) == 0.0 &&
-                                     depth_image.at<float>(y, x) > 0.0;
+          // Check if edge point and assign the nearest neighbor label.
+          const bool is_edge_point = edge_map_8u.at<uint8_t>(y, x) == 0u &&
+                                     depth_image.at<float>(y, x) > 0.0f;
           if (is_edge_point) {
-            const cv::Vec3f edge_point = depth_map.at<cv::Vec3f>(y, x);
-            constexpr int filter_size = 5u;
-            double min_dist = std::numeric_limits<double>::max();
-            for (int i = -filter_size / 2; i <= filter_size / 2; ++i) {
+            // We assign edgepoints by default to -1.
+            label = -1;
+            const cv::Vec3f& edge_point = depth_map.at<cv::Vec3f>(y, x);
+            constexpr double kMinNearestNeighborDistance = 0.05;
+            double min_dist = kMinNearestNeighborDistance;
+            constexpr int kFilterSizeHalfFloored = 4u;
+            for (int i = -kFilterSizeHalfFloored; i <= kFilterSizeHalfFloored;
+                 ++i) {
               if (static_cast<int>(x) + i < 0) {
                 continue;
               }
               if (static_cast<int>(x) + i >= output_labels.cols) {
                 break;
               }
-              for (int j = -filter_size / 2; j <= filter_size / 2; ++j) {
+              for (int j = -kFilterSizeHalfFloored; j <= kFilterSizeHalfFloored;
+                   ++j) {
                 if (static_cast<int>(y) + j < 0 || (i == 0 && j == 0)) {
                   continue;
                 }
@@ -814,15 +828,21 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                 }
                 const cv::Vec3f filter_point =
                     depth_map.at<cv::Vec3f>(y + j, x + i);
-                double dist = cv::norm(edge_point - filter_point);
-                int label_tmp = output_labels.at<int32_t>(y + j, x + i);
-                if (dist < min_dist && label_tmp > 0) {
+                const double dist = cv::norm(edge_point - filter_point);
+                const int label_tmp = output_labels.at<int32_t>(y + j, x + i);
+                const bool filter_point_is_edge_point =
+                    edge_map_8u.at<uint8_t>(y + j, x + i) == 0u &&
+                    depth_image.at<float>(y + j, x + i) > 0.0f;
+                if (dist < min_dist && label_tmp >= 0 &&
+                    !filter_point_is_edge_point) {
                   min_dist = dist;
                   label = label_tmp;
-                  output.at<cv::Vec3b>(y, x) = cv::Vec3b(
-                      colors[label][0], colors[label][1], colors[label][2]);
                 }
               }
+            }
+            if (label >= 0) {
+              output.at<cv::Vec3b>(y, x) = cv::Vec3b(
+                  colors[label][0], colors[label][1], colors[label][2]);
             }
           }
           if (label < 0) {
