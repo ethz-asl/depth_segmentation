@@ -834,9 +834,17 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
             cv::Vec3f point = depth_map.at<cv::Vec3f>(y, x);
             cv::Vec3f normal = normal_map.at<cv::Vec3f>(y, x);
             cv::Vec3b original_color = rgb_image.at<cv::Vec3b>(y, x);
-            cv::Vec3f color_f{float(original_color[0]),
-                              float(original_color[1]),
-                              float(original_color[2])};
+            cv::Vec3f color_f;
+            constexpr bool kUseOriginalColors = true;
+            if (kUseOriginalColors) {
+              color_f = cv::Vec3f(static_cast<float>(original_color[0]),
+                                  static_cast<float>(original_color[1]),
+                                  static_cast<float>(original_color[2]));
+            } else {
+              color_f = cv::Vec3f(static_cast<float>(colors[label][0]),
+                                  static_cast<float>(colors[label][1]),
+                                  static_cast<float>(colors[label][2]));
+            }
             std::vector<cv::Vec3f> rgb_point_with_normals{point, normal,
                                                           color_f};
             Segment& segment = (*segments)[labels_map.at(label)];
