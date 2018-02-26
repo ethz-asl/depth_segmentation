@@ -145,7 +145,7 @@ class DepthSegmentationNode {
       sensor_msgs::PointCloud2 pcl2_msg;
       pcl::toROSMsg(*segment_pcl, pcl2_msg);
       pcl2_msg.header.stamp = timestamp;
-      pcl2_msg.header.frame_id = "camera_depth_optical_frame";
+      pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
       point_cloud2_segment_pub_.publish(pcl2_msg);
     }
     // Just for rviz also publish the whole scene, as otherwise only ~10
@@ -154,7 +154,7 @@ class DepthSegmentationNode {
     sensor_msgs::PointCloud2 pcl2_msg;
     pcl::toROSMsg(*scene_pcl, pcl2_msg);
     pcl2_msg.header.stamp = timestamp;
-    pcl2_msg.header.frame_id = "camera_depth_optical_frame";
+    pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
     point_cloud2_scene_pub_.publish(pcl2_msg);
   }
 
