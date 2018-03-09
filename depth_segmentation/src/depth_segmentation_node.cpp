@@ -247,19 +247,26 @@ class DepthSegmentationNode {
         }
 
         // Compute maximum distance map.
-        cv::Mat distance_map(depth_camera_.getWidth(),
-                             depth_camera_.getHeight(), CV_32FC1);
-        depth_segmenter_.computeMaxDistanceMap(depth_map, &distance_map);
+        cv::Mat distance_map = cv::Mat::zeros(
+            depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
+        if (params_.max_distance.use_max_distance) {
+          depth_segmenter_.computeMaxDistanceMap(depth_map, &distance_map);
+        }
 
         // Compute minimum convexity map.
-        cv::Mat convexity_map(depth_camera_.getWidth(),
-                              depth_camera_.getHeight(), CV_32FC1);
-        depth_segmenter_.computeMinConvexityMap(depth_map, normal_map,
-                                                &convexity_map);
+        cv::Mat convexity_map = cv::Mat::zeros(
+            depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
+        if (params_.min_convexity.use_min_convexity) {
+          depth_segmenter_.computeMinConvexityMap(depth_map, normal_map,
+                                                  &convexity_map);
+        }
+
+        // Compute final edge map.
         cv::Mat edge_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
                          CV_32FC1);
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                              discontinuity_map, &edge_map);
+
         cv::Mat label_map(edge_map.size(), CV_32FC1);
         cv::Mat remove_no_values =
             cv::Mat::zeros(edge_map.size(), edge_map.type());

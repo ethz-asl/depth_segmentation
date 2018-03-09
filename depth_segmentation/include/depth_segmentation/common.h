@@ -44,6 +44,7 @@ struct SurfaceNormalParams {
 
 struct MaxDistanceMapParams {
   MaxDistanceMapParams() { CHECK_EQ(window_size % 2u, 1u); }
+  bool use_max_distance = true;
   size_t window_size = 3u;
   bool display = false;
   bool exclude_nan_as_max_distance = false;
@@ -68,6 +69,7 @@ struct DepthDiscontinuityMapParams {
 
 struct MinConvexityMapParams {
   MinConvexityMapParams() { CHECK_EQ(window_size % 2u, 1u); }
+  bool use_min_convexity = true;
   size_t morphological_opening_size = 1u;
   size_t window_size = 5u;
   size_t step_size = 1u;

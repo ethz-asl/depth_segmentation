@@ -224,6 +224,7 @@ void DepthSegmenter::dynamicReconfigureCallback(
     LOG(ERROR) << "Set the max distnace window size to an odd number.";
     return;
   }
+  params_.max_distance.use_max_distance = config.max_distance_use_max_distance;
   params_.max_distance.display = config.max_distance_display;
   params_.max_distance.exclude_nan_as_max_distance =
       config.max_distance_exclude_nan_as_max_distance;
@@ -249,6 +250,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
     LOG(ERROR) << "Set the min convexity window size to an odd number.";
     return;
   }
+  params_.min_convexity.use_min_convexity =
+      config.min_convexity_use_min_convexity;
   params_.min_convexity.morphological_opening_size =
       config.min_convexity_morphological_opening_size;
   params_.min_convexity.step_size = config.min_convexity_step_size;
