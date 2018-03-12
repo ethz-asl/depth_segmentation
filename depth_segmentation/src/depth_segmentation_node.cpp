@@ -173,9 +173,8 @@ class DepthSegmentationNode {
             depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
       }
 
-      // rescaled_depth = cv::Mat(cv_depth_image->image.size(), CV_32FC1);
-      // cv::rgbd::rescaleDepth(cv_depth_image->image, CV_32FC1,
-      // rescaled_depth);
+      rescaled_depth = cv::Mat(cv_depth_image->image.size(), CV_32FC1);
+      cv::rgbd::rescaleDepth(cv_depth_image->image, CV_32FC1, rescaled_depth);
 
       cv_bridge::CvImagePtr cv_rgb_image;
       cv_rgb_image =
@@ -219,74 +218,64 @@ class DepthSegmentationNode {
             LOG(ERROR) << "Failed to compute Transform.";
           }
         }
+        cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
+                          CV_32FC3);
+        depth_segmenter_.computeDepthMap(rescaled_depth, &depth_map);
 
-        // cv::Mat depth_map(depth_camera_.getWidth(),
-        // depth_camera_.getHeight(),
-        //                   CV_32FC3);
-        // depth_segmenter_.computeDepthMap(rescaled_depth, &depth_map);
-        //
-        // // Compute normal map.
-        // cv::Mat normal_map(depth_map.size(), CV_32FC3, 0.0f);
-        // if (params_.normals.method ==
-        //         depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
-        //     params_.normals.method ==
-        //         depth_segmentation::SurfaceNormalEstimationMethod::kSri ||
-        //     params_.normals.method ==
-        //         depth_segmentation::SurfaceNormalEstimationMethod::
-        //             kDepthWindowFilter) {
-        //   depth_segmenter_.computeNormalMap(depth_map, &normal_map);
-        // } else if (params_.normals.method ==
-        //            depth_segmentation::SurfaceNormalEstimationMethod::
-        //                kLinemod) {
-        //   depth_segmenter_.computeNormalMap(cv_depth_image->image,
-        //   &normal_map);
-        // }
-        //
-        // // Compute depth discontinuity map.
-        // cv::Mat discontinuity_map = cv::Mat::zeros(
-        //     depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
-        // if (params_.depth_discontinuity.use_discontinuity) {
-        //   depth_segmenter_.computeDepthDiscontinuityMap(rescaled_depth,
-        //                                                 &discontinuity_map);
-        // }
-        //
-        // // Compute maximum distance map.
-        // cv::Mat distance_map = cv::Mat::zeros(
-        //     depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
-        // if (params_.max_distance.use_max_distance) {
-        //   depth_segmenter_.computeMaxDistanceMap(depth_map, &distance_map);
-        // }
-        //
-        // // Compute minimum convexity map.
-        // cv::Mat convexity_map = cv::Mat::zeros(
-        //     depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
-        // if (params_.min_convexity.use_min_convexity) {
-        //   depth_segmenter_.computeMinConvexityMap(depth_map, normal_map,
-        //                                           &convexity_map);
-        // }
-        //
-        // // Compute final edge map.
-        // cv::Mat edge_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
-        //                  CV_32FC1);
-        // depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
-        //                                      discontinuity_map, &edge_map);
-        //
-        // cv::Mat label_map(edge_map.size(), CV_32FC1);
-        // cv::Mat remove_no_values =
-        //     cv::Mat::zeros(edge_map.size(), edge_map.type());
-        // edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
-        // edge_map = remove_no_values;
-        // std::vector<depth_segmentation::Segment> segments;
-        // depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
-        //                           depth_map, edge_map, normal_map,
-        //                           &label_map, &segments);
+        // Compute normal map.
+        cv::Mat normal_map(depth_map.size(), CV_32FC3, 0.0f);
+        if (params_.normals.method ==
+                depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
+            params_.normals.method ==
+                depth_segmentation::SurfaceNormalEstimationMethod::kSri ||
+            params_.normals.method ==
+                depth_segmentation::SurfaceNormalEstimationMethod::
+                    kDepthWindowFilter) {
+          depth_segmenter_.computeNormalMap(depth_map, &normal_map);
+        } else if (params_.normals.method ==
+                   depth_segmentation::SurfaceNormalEstimationMethod::
+                       kLinemod) {
+          depth_segmenter_.computeNormalMap(cv_depth_image->image, &normal_map);
+        }
 
-        cv::Mat label_map(cv_depth_image->image.size(), CV_32FC1);
+        // Compute depth discontinuity map.
+        cv::Mat discontinuity_map = cv::Mat::zeros(
+            depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
+        if (params_.depth_discontinuity.use_discontinuity) {
+          depth_segmenter_.computeDepthDiscontinuityMap(rescaled_depth,
+                                                        &discontinuity_map);
+        }
+
+        // Compute maximum distance map.
+        cv::Mat distance_map = cv::Mat::zeros(
+            depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
+        if (params_.max_distance.use_max_distance) {
+          depth_segmenter_.computeMaxDistanceMap(depth_map, &distance_map);
+        }
+
+        // Compute minimum convexity map.
+        cv::Mat convexity_map = cv::Mat::zeros(
+            depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
+        if (params_.min_convexity.use_min_convexity) {
+          depth_segmenter_.computeMinConvexityMap(depth_map, normal_map,
+                                                  &convexity_map);
+        }
+
+        // Compute final edge map.
+        cv::Mat edge_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
+                         CV_32FC1);
+        depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
+                                             discontinuity_map, &edge_map);
+
+        cv::Mat label_map(edge_map.size(), CV_32FC1);
+        cv::Mat remove_no_values =
+            cv::Mat::zeros(edge_map.size(), edge_map.type());
+        edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
+        edge_map = remove_no_values;
         std::vector<depth_segmentation::Segment> segments;
-        depth_segmenter_.segmentSingleFrame(cv_rgb_image->image,
-                                            cv_depth_image->image, params_,
-                                            &label_map, &segments);
-
+        depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
+                                  depth_map, edge_map, normal_map, &label_map,
+                                  &segments);
         if (segments.size() > 0) {
           publish_segments(segments, depth_msg->header.stamp);
         }

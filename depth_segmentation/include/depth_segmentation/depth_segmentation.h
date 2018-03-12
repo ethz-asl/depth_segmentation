@@ -160,10 +160,6 @@ class DepthSegmenter {
                  std::vector<std::vector<cv::Point2i>>* labels);
   inline DepthCamera getDepthCamera() const { return depth_camera_; }
 
-  void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
-                          const depth_segmentation::Params& params,
-                          cv::Mat* label_map, std::vector<Segment>* segments);
-
  private:
   void generateRandomColorsAndLabels(size_t contours_size,
                                      std::vector<cv::Scalar>* colors,
@@ -175,6 +171,10 @@ class DepthSegmenter {
   std::vector<cv::Scalar> colors_;
   std::vector<int> labels_;
 };
+
+void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
+                        const depth_segmentation::Params& params,
+                        cv::Mat* label_map, std::vector<Segment>* segments);
 }  // namespace depth_segmentation
 
 #endif  // DEPTH_SEGMENTATION_DEPTH_SEGMENTATION_H_
