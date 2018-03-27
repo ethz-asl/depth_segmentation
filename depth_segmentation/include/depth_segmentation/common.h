@@ -35,35 +35,35 @@ struct SurfaceNormalParams {
       CHECK_LT(window_size, 8u);
     }
   }
-  size_t window_size = 11u;
+  size_t window_size = 13u;
   SurfaceNormalEstimationMethod method =
       SurfaceNormalEstimationMethod::kDepthWindowFilter;
   bool display = false;
-  double distance_factor_threshold = 0.01;
+  double distance_factor_threshold = 0.05;
 };
 
 struct MaxDistanceMapParams {
   MaxDistanceMapParams() { CHECK_EQ(window_size % 2u, 1u); }
   bool use_max_distance = true;
-  size_t window_size = 3u;
+  size_t window_size = 1u;
   bool display = false;
   bool exclude_nan_as_max_distance = false;
   bool ignore_nan_coordinates = false;  // TODO(ff): This probably doesn't make
                                         // a lot of sense -> consider removing
                                         // it.
   bool use_threshold = true;
-  double noise_thresholding_factor = 6.0;
+  double noise_thresholding_factor = 10.0;
   double sensor_noise_param_1st_order = 0.0012;  // From Nguyen et al. (2012)
   double sensor_noise_param_2nd_order = 0.0019;  // From Nguyen et al. (2012)
   double sensor_noise_param_3rd_order = 0.0001;  // From Nguyen et al. (2012)
-  double sensor_min_distance = 0.2;
+  double sensor_min_distance = 0.02;
 };
 
 struct DepthDiscontinuityMapParams {
   DepthDiscontinuityMapParams() { CHECK_EQ(kernel_size % 2u, 1u); }
   bool use_discontinuity = true;
   size_t kernel_size = 3u;
-  double discontinuity_ratio = 0.05;
+  double discontinuity_ratio = 0.01;
   bool display = false;
 };
 
@@ -76,7 +76,7 @@ struct MinConvexityMapParams {
   bool display = false;
   bool use_morphological_opening = true;
   bool use_threshold = true;
-  double threshold = 0.95;
+  double threshold = 0.97;
   double mask_threshold = -0.0005;
 };
 
@@ -95,7 +95,7 @@ enum class LabelMapMethod {
 
 struct LabelMapParams {
   LabelMapMethod method = LabelMapMethod::kContour;
-  size_t min_size = 1u;
+  size_t min_size = 500u;
   bool use_inpaint = false;
   size_t inpaint_method = 0u;
   bool display = true;
