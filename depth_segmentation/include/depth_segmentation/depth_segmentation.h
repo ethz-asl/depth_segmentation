@@ -153,6 +153,7 @@ class DepthSegmenter {
   void labelMap(const cv::Mat& rgb_image, const cv::Mat& depth_image,
                 const cv::Mat& depth_map, const cv::Mat& edge_map,
                 const cv::Mat& normal_map, cv::Mat* labeled_map,
+                std::vector<cv::Mat>* segment_masks,
                 std::vector<Segment>* segments);
   void inpaintImage(const cv::Mat& depth_image, const cv::Mat& edge_map,
                     const cv::Mat& label_map, cv::Mat* inpainted);
@@ -175,6 +176,7 @@ class DepthSegmenter {
 void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
                         const cv::Mat& depth_intrinsics,
                         depth_segmentation::Params& params, cv::Mat* label_map,
+                        std::vector<cv::Mat>* segment_masks,
                         std::vector<Segment>* segments);
 
 }  // namespace depth_segmentation
