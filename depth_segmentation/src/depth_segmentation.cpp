@@ -960,7 +960,8 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   *labeled_map = output;
 }
 
-void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
+void segmentSingleFrame(const bool rescale_depth, const cv::Mat& rgb_image,
+                        const cv::Mat& depth_image,
                         const cv::Mat& depth_intrinsics,
                         depth_segmentation::Params& params, cv::Mat* label_map,
                         std::vector<cv::Mat>* segment_masks,
@@ -980,7 +981,11 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   depth_segmenter.initialize();
 
   cv::Mat rescaled_depth = cv::Mat(depth_image.size(), CV_32FC1);
-  cv::rgbd::rescaleDepth(depth_image, CV_32FC1, rescaled_depth);
+  if (rescale_depth) {
+    cv::rgbd::rescaleDepth(depth_image, CV_32FC1, rescaled_depth);
+  } else {
+    rescaled_depth = depth_image;
+  }
 
   // Compute depth map from rescaled depth image.
   cv::Mat depth_map(rescaled_depth.size(), CV_32FC3);
