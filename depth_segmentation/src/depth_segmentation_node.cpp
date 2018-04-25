@@ -273,9 +273,10 @@ class DepthSegmentationNode {
         edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
         edge_map = remove_no_values;
         std::vector<depth_segmentation::Segment> segments;
+        std::vector<cv::Mat> segment_masks;
         depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
                                   depth_map, edge_map, normal_map, &label_map,
-                                  &segments);
+                                  &segment_masks, &segments);
         if (segments.size() > 0) {
           publish_segments(segments, depth_msg->header.stamp);
         }

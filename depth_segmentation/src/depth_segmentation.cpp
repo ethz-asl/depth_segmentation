@@ -723,6 +723,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                               const cv::Mat& depth_image,
                               const cv::Mat& depth_map, const cv::Mat& edge_map,
                               const cv::Mat& normal_map, cv::Mat* labeled_map,
+                              std::vector<cv::Mat>* segment_masks,
                               std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
@@ -734,7 +735,11 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   CHECK_EQ(depth_image.size(), edge_map.size());
   CHECK_EQ(depth_image.size(), depth_map.size());
   CHECK_NOTNULL(labeled_map);
+  CHECK_NOTNULL(segment_masks);
   CHECK_NOTNULL(segments)->clear();
+
+
+  constexpr size_t kMaskValue = 255u;
 
   cv::Mat output = cv::Mat::zeros(depth_image.size(), CV_8UC3);
   switch (params_.label.method) {
@@ -798,7 +803,10 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
         }
       }
       segments->resize(labels_map.size());
-
+      segment_masks->resize(labels_map.size());
+      for (cv::Mat& segment_mask : *segment_masks) {
+        segment_mask = cv::Mat(depth_image.size(), CV_8UC1, cv::Scalar(0));
+      }
       for (size_t x = 0u; x < output_labels.cols; ++x) {
         for (size_t y = 0u; y < output_labels.rows; ++y) {
           int32_t label = output_labels.at<int32_t>(y, x);
@@ -873,6 +881,8 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
             segment.normals.push_back(normal);
             segment.original_colors.push_back(color_f);
             segment.label.insert(label);
+            cv::Mat& segment_mask = (*segment_masks)[labels_map.at(label)];
+            segment_mask.at<uint8_t>(y, x) = kMaskValue;
           }
         }
       }
@@ -880,6 +890,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       break;
     }
     case LabelMapMethod::kFloodFill: {
+      LOG(FATAL) << "This wasn't tested in a long time, please test first.";
       // TODO(ff): Move to method.
       cv::Mat binary_edge_map;
       constexpr float kEdgeMapThresholdValue = 0.0f;
@@ -901,9 +912,16 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
         } else {
           color = cv::Vec3b(colors[i][0], colors[i][1], colors[i][2]);
         }
+        cv::Mat segment_mask =
+            cv::Mat(depth_image.size(), CV_8UC1, cv::Scalar(0));
         for (size_t j = 0u; j < labeled_segments[i].size(); ++j) {
           const size_t x = labeled_segments[i][j].x;
           const size_t y = labeled_segments[i][j].y;
+          output.at<cv::Vec3b>(y, x) = color;
+          // TODO(ff): We might need this here.
+          // if (color == cv::Vec3b(0, 0, 0)) {
+          //   continue;
+          // }
           cv::Vec3f point = depth_map.at<cv::Vec3f>(y, x);
           cv::Vec3f normal = normal_map.at<cv::Vec3f>(y, x);
           cv::Vec3b original_color = rgb_image.at<cv::Vec3f>(y, x);
@@ -914,8 +932,10 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
           segment.normals.push_back(normal);
           segment.original_colors.push_back(color_f);
           segment.label.insert(i);
-          output.at<cv::Vec3b>(y, x) = color;
+          segment_mask.at<uint8_t>(y, x) = kMaskValue;
         }
+        CHECK_EQ(segment_mask.size(), depth_image.size());
+        segment_masks->push_back(segment_mask.clone());
       }
       break;
     }
@@ -946,10 +966,12 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
 void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
                         const cv::Mat& depth_intrinsics,
                         depth_segmentation::Params& params, cv::Mat* label_map,
+                        std::vector<cv::Mat>* segment_masks,
                         std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
   CHECK_NOTNULL(label_map);
+  CHECK_NOTNULL(segment_masks);
   CHECK_NOTNULL(segments);
 
   DepthCamera depth_camera;
@@ -1017,7 +1039,7 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
   edge_map = remove_no_values;
   depth_segmenter.labelMap(rgb_image, rescaled_depth, depth_map, edge_map,
-                           normal_map, label_map, segments);
+                           normal_map, label_map, segment_masks, segments);
 }
 
 }  // namespace depth_segmentation
