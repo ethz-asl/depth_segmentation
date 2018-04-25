@@ -955,7 +955,6 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   DepthCamera depth_camera;
   DepthSegmenter depth_segmenter(depth_camera, params);
 
-  // TODO(ntonci): Check if proper size.
   depth_camera.initialize(depth_image.rows, depth_image.cols, CV_32FC1,
                           depth_intrinsics);
   depth_segmenter.initialize();

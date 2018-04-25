@@ -132,7 +132,7 @@ void visualizeDepthMap(const cv::Mat& depth_map, cv::viz::Viz3d* viz_3d) {
   viz_3d->showWidget("cloud",
                      cv::viz::WCloud(depth_map, cv::viz::Color::red()));
   viz_3d->showWidget("coo", cv::viz::WCoordinateSystem(1.5));
-  viz_3d->spinOnce(0, true);
+  viz_3d->spin();
 }
 
 void visualizeDepthMapWithNormals(const cv::Mat& depth_map,
@@ -151,7 +151,7 @@ void visualizeDepthMapWithNormals(const cv::Mat& depth_map,
                      cv::viz::WCloudNormals(depth_map, normals, 50, 0.02f,
                                             cv::viz::Color::green()));
   viz_3d->showWidget("coo", cv::viz::WCoordinateSystem(1.5));
-  viz_3d->spinOnce(0, true);
+  viz_3d->spin();
 }
 
 void computeCovariance(const cv::Mat& neighborhood, const cv::Vec3f& mean,
