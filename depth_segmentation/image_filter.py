@@ -27,9 +27,10 @@ class SubThenFilter:
             print(e)
 
         cv_image = np.nan_to_num(cv_image)
-
-        kernel = np.ones((3, 3), np.uint8)
-        cv_image = cv2.dilate(cv_image, kernel, 3)
+        kernel_size = 3
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        dilate_iterations = 1
+        cv_image = cv2.dilate(cv_image, kernel, dilate_iterations)
 
         if self.use_median_blur:
             cv_image = cv2.medianBlur(cv_image, self.median_blur_size)

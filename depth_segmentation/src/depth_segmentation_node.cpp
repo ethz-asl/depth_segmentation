@@ -145,7 +145,7 @@ class DepthSegmentationNode {
       sensor_msgs::PointCloud2 pcl2_msg;
       pcl::toROSMsg(*segment_pcl, pcl2_msg);
       pcl2_msg.header.stamp = timestamp;
-      pcl2_msg.header.frame_id = "camera_depth_optical_frame";
+      pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
       point_cloud2_segment_pub_.publish(pcl2_msg);
     }
     // Just for rviz also publish the whole scene, as otherwise only ~10
@@ -154,7 +154,7 @@ class DepthSegmentationNode {
     sensor_msgs::PointCloud2 pcl2_msg;
     pcl::toROSMsg(*scene_pcl, pcl2_msg);
     pcl2_msg.header.stamp = timestamp;
-    pcl2_msg.header.frame_id = "camera_depth_optical_frame";
+    pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
     point_cloud2_scene_pub_.publish(pcl2_msg);
   }
 
@@ -223,7 +223,7 @@ class DepthSegmentationNode {
         depth_segmenter_.computeDepthMap(rescaled_depth, &depth_map);
 
         // Compute normal map.
-        cv::Mat normal_map(depth_map.size(), CV_32FC3);
+        cv::Mat normal_map(depth_map.size(), CV_32FC3, 0.0f);
         if (params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
             params_.normals.method ==
@@ -238,20 +238,35 @@ class DepthSegmentationNode {
           depth_segmenter_.computeNormalMap(cv_depth_image->image, &normal_map);
         }
 
+        // Compute depth discontinuity map.
+        cv::Mat discontinuity_map = cv::Mat::zeros(
+            depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
+        if (params_.depth_discontinuity.use_discontinuity) {
+          depth_segmenter_.computeDepthDiscontinuityMap(rescaled_depth,
+                                                        &discontinuity_map);
+        }
+
         // Compute maximum distance map.
-        cv::Mat distance_map(depth_camera_.getWidth(),
-                             depth_camera_.getHeight(), CV_32FC1);
-        depth_segmenter_.computeMaxDistanceMap(depth_map, &distance_map);
+        cv::Mat distance_map = cv::Mat::zeros(
+            depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
+        if (params_.max_distance.use_max_distance) {
+          depth_segmenter_.computeMaxDistanceMap(depth_map, &distance_map);
+        }
 
         // Compute minimum convexity map.
-        cv::Mat convexity_map(depth_camera_.getWidth(),
-                              depth_camera_.getHeight(), CV_32FC1);
-        depth_segmenter_.computeMinConvexityMap(depth_map, normal_map,
-                                                &convexity_map);
+        cv::Mat convexity_map = cv::Mat::zeros(
+            depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
+        if (params_.min_convexity.use_min_convexity) {
+          depth_segmenter_.computeMinConvexityMap(depth_map, normal_map,
+                                                  &convexity_map);
+        }
+
+        // Compute final edge map.
         cv::Mat edge_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
                          CV_32FC1);
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
-                                             &edge_map);
+                                             discontinuity_map, &edge_map);
+
         cv::Mat label_map(edge_map.size(), CV_32FC1);
         cv::Mat remove_no_values =
             cv::Mat::zeros(edge_map.size(), edge_map.type());
@@ -326,6 +341,7 @@ class DepthSegmentationNode {
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
+  LOG(INFO) << "Starting depth segmentation ... ";
   ros::init(argc, argv, "depth_segmentation_node");
   DepthSegmentationNode depth_segmentation_node;
 
