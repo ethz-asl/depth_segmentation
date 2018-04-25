@@ -22,6 +22,7 @@ class DepthSegmentationTest : public ::testing::Test {
     depth_segmenter_.initialize();
     params_.normals.method = SurfaceNormalEstimationMethod::kDepthWindowFilter;
     params_.normals.window_size = 3u;
+    params_.normals.distance_factor_threshold = 0.05;
   }
   virtual ~DepthSegmentationTest() {}
   virtual void SetUp() {}
@@ -149,14 +150,19 @@ TEST_F(DepthSegmentationTest, testNormals2) {
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, normals, &viz_3d);
 
-  double total_sum = 0.0;
-  for (size_t x = 0u; x < kNormalImageHeight; ++x) {
-    cv::Vec3f normal = normals.at<cv::Vec3f>(x);
-    cv::Vec3f expected_normal = expected_normals.at<cv::Vec3f>(x);
-    total_sum += cv::norm(normal - expected_normal);
-  }
+  size_t counter = 0;
+  for (size_t y = 0u; y < kNormalImageHeight; ++y) {
+    for (size_t x = 0u; x < kNormalImageWidth; ++x) {
+      cv::Vec3f normal = normals.at<cv::Vec3f>(y, x);
+      cv::Vec3f expected_normal = expected_normals.at<cv::Vec3f>(y, x);
+      if (y != kNormalImageHeight / 2 - 1) {
+        EXPECT_NEAR(cv::norm(normal - expected_normal), 0.0, 1.0e-5);
 
-  EXPECT_EQ(total_sum, 0.0);
+      } else {
+        EXPECT_NEAR(cv::norm(normal - expected_normal), 0.292, 1.0e-3);
+      }
+    }
+  }
 }
 
 TEST_F(DepthSegmentationTest, testConvexity) {
