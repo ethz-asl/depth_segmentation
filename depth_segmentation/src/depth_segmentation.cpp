@@ -960,7 +960,13 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   depth_segmenter.initialize();
 
   cv::Mat rescaled_depth = cv::Mat(depth_image.size(), CV_32FC1);
-  cv::rgbd::rescaleDepth(depth_image, CV_32FC1, rescaled_depth);
+  if (depth_image.type() == CV_16UC1) {
+    cv::rgbd::rescaleDepth(depth_image, CV_32FC1, rescaled_depth);
+  } else if (depth_image.type() != CV_32FC1) {
+    LOG(FATAL) << "Depth image is of unknown type.";
+  } else {
+    rescaled_depth = depth_image;
+  }
 
   // Compute depth map from rescaled depth image.
   cv::Mat depth_map(rescaled_depth.size(), CV_32FC3);

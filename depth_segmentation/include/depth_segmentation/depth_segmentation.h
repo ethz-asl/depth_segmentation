@@ -172,6 +172,7 @@ class DepthSegmenter {
   std::vector<int> labels_;
 };
 
+// TODO(ntonci): Make a unit test.
 void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
                         const cv::Mat& depth_intrinsics,
                         depth_segmentation::Params& params, cv::Mat* label_map,

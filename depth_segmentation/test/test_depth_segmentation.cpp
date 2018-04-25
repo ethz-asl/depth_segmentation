@@ -149,7 +149,14 @@ TEST_F(DepthSegmentationTest, testNormals2) {
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, normals, &viz_3d);
 
-  EXPECT_EQ(cv::countNonZero(normals != expected_normals), 0);
+  double total_sum = 0.0;
+  for (size_t x = 0u; x < kNormalImageHeight; ++x) {
+    cv::Vec3f normal = normals.at<cv::Vec3f>(x);
+    cv::Vec3f expected_normal = expected_normals.at<cv::Vec3f>(x);
+    total_sum += cv::norm(normal - expected_normal);
+  }
+
+  EXPECT_EQ(total_sum, 0.0);
 }
 
 TEST_F(DepthSegmentationTest, testConvexity) {
