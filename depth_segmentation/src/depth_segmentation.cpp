@@ -738,6 +738,9 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   CHECK_NOTNULL(segment_masks);
   CHECK_NOTNULL(segments)->clear();
 
+
+  constexpr size_t kMaskValue = 255u;
+
   cv::Mat output = cv::Mat::zeros(depth_image.size(), CV_8UC3);
   switch (params_.label.method) {
     case LabelMapMethod::kContour: {
@@ -879,7 +882,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
             segment.original_colors.push_back(color_f);
             segment.label.insert(label);
             cv::Mat& segment_mask = (*segment_masks)[labels_map.at(label)];
-            segment_mask.at<uint8_t>(y, x) = 255u;
+            segment_mask.at<uint8_t>(y, x) = kMaskValue;
           }
         }
       }
@@ -929,7 +932,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
           segment.normals.push_back(normal);
           segment.original_colors.push_back(color_f);
           segment.label.insert(i);
-          segment_mask.at<uint8_t>(y, x) = 255;
+          segment_mask.at<uint8_t>(y, x) = kMaskValue;
         }
         CHECK_EQ(segment_mask.size(), depth_image.size());
         segment_masks->push_back(segment_mask.clone());
