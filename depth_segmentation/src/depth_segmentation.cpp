@@ -960,8 +960,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   *labeled_map = output;
 }
 
-void segmentSingleFrame(const bool rescale_depth, const cv::Mat& rgb_image,
-                        const cv::Mat& depth_image,
+void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
                         const cv::Mat& depth_intrinsics,
                         depth_segmentation::Params& params, cv::Mat* label_map,
                         std::vector<cv::Mat>* segment_masks,
@@ -975,14 +974,15 @@ void segmentSingleFrame(const bool rescale_depth, const cv::Mat& rgb_image,
   DepthCamera depth_camera;
   DepthSegmenter depth_segmenter(depth_camera, params);
 
-  // TODO(ntonci): Check if proper size.
   depth_camera.initialize(depth_image.rows, depth_image.cols, CV_32FC1,
                           depth_intrinsics);
   depth_segmenter.initialize();
 
   cv::Mat rescaled_depth = cv::Mat(depth_image.size(), CV_32FC1);
-  if (rescale_depth) {
+  if (depth_image.type() == CV_16UC1) {
     cv::rgbd::rescaleDepth(depth_image, CV_32FC1, rescaled_depth);
+  } else if (depth_image.type() != CV_32FC1) {
+    LOG(FATAL) << "Depth image is of unknown type.";
   } else {
     rescaled_depth = depth_image;
   }
