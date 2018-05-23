@@ -1,7 +1,7 @@
 depth_segmentation_node: {
   depth_discontinuity_display: false,
   depth_discontinuity_kernel_size: 3,
-  depth_discontinuity_ratio: 0.05,
+  depth_discontinuity_ratio: 0.001,
   depth_discontinuity_use_depth_discontinuity: true,
   final_edge_display: false,
   final_edge_morphological_closing_size: 1,
