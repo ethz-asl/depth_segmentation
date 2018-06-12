@@ -738,7 +738,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   CHECK_NOTNULL(segment_masks);
   CHECK_NOTNULL(segments)->clear();
 
-
   constexpr size_t kMaskValue = 255u;
 
   cv::Mat output = cv::Mat::zeros(depth_image.size(), CV_8UC3);
@@ -966,11 +965,13 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
 void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
                         const cv::Mat& depth_intrinsics,
                         depth_segmentation::Params& params, cv::Mat* label_map,
+                        cv::Mat* normal_map,
                         std::vector<cv::Mat>* segment_masks,
                         std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
   CHECK_NOTNULL(label_map);
+  CHECK_NOTNULL(normal_map);
   CHECK_NOTNULL(segment_masks);
   CHECK_NOTNULL(segments);
 
@@ -995,7 +996,7 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   depth_segmenter.computeDepthMap(depth_image, &depth_map);
 
   // Compute normals based on specified method.
-  cv::Mat normal_map(depth_map.size(), CV_32FC3, 0.0f);
+  *normal_map = cv::Mat(depth_map.size(), CV_32FC3, 0.0f);
   if (params.normals.method ==
           depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
       params.normals.method ==
@@ -1003,10 +1004,10 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
       params.normals.method ==
           depth_segmentation::SurfaceNormalEstimationMethod::
               kDepthWindowFilter) {
-    depth_segmenter.computeNormalMap(depth_map, &normal_map);
+    depth_segmenter.computeNormalMap(depth_map, normal_map);
   } else if (params.normals.method ==
              depth_segmentation::SurfaceNormalEstimationMethod::kLinemod) {
-    depth_segmenter.computeNormalMap(depth_image, &normal_map);
+    depth_segmenter.computeNormalMap(depth_image, normal_map);
   }
 
   // Compute depth discontinuity map.
@@ -1025,7 +1026,7 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   // Compute minimum convexity map.
   cv::Mat convexity_map = cv::Mat::zeros(rescaled_depth.size(), CV_32FC1);
   if (params.min_convexity.use_min_convexity) {
-    depth_segmenter.computeMinConvexityMap(depth_map, normal_map,
+    depth_segmenter.computeMinConvexityMap(depth_map, *normal_map,
                                            &convexity_map);
   }
 
@@ -1039,7 +1040,7 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
   edge_map = remove_no_values;
   depth_segmenter.labelMap(rgb_image, rescaled_depth, depth_map, edge_map,
-                           normal_map, label_map, segment_masks, segments);
+                           *normal_map, label_map, segment_masks, segments);
 }
 
 }  // namespace depth_segmentation
