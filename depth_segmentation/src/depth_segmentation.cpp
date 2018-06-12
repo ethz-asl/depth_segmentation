@@ -940,12 +940,12 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     }
   }
   // Remove small segments from segments vector.
-  std::vector<Segment>::iterator it = segments->begin();
-  while (it != segments->end()) {
-    if (it->points.size() < params_.label.min_size) {
-      it = segments->erase(it);
+  for (size_t i = 0u; i < segments->size();) {
+    if ((*segments)[i].points.size() < params_.label.min_size) {
+      segments->erase(segments->begin() + i);
+      segment_masks->erase(segment_masks->begin() + i);
     } else {
-      ++it;
+      ++i;
     }
   }
 
@@ -993,7 +993,7 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
 
   // Compute depth map from rescaled depth image.
   cv::Mat depth_map(rescaled_depth.size(), CV_32FC3);
-  depth_segmenter.computeDepthMap(depth_image, &depth_map);
+  depth_segmenter.computeDepthMap(rescaled_depth, &depth_map);
 
   // Compute normals based on specified method.
   *normal_map = cv::Mat(depth_map.size(), CV_32FC3, 0.0f);
