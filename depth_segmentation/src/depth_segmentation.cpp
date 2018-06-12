@@ -941,12 +941,12 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     }
   }
   // Remove small segments from segments vector.
-  std::vector<Segment>::iterator it = segments->begin();
-  while (it != segments->end()) {
-    if (it->points.size() < params_.label.min_size) {
-      it = segments->erase(it);
+  for (size_t i = 0u; i < segments->size();) {
+    if ((*segments)[i].points.size() < params_.label.min_size) {
+      segments->erase(segments->begin() + i);
+      segment_masks->erase(segment_masks->begin() + i);
     } else {
-      ++it;
+      ++i;
     }
   }
 
