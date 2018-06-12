@@ -992,7 +992,7 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
 
   // Compute depth map from rescaled depth image.
   cv::Mat depth_map(rescaled_depth.size(), CV_32FC3);
-  depth_segmenter.computeDepthMap(depth_image, &depth_map);
+  depth_segmenter.computeDepthMap(rescaled_depth, &depth_map);
 
   // Compute normals based on specified method.
   cv::Mat normal_map(depth_map.size(), CV_32FC3, 0.0f);
