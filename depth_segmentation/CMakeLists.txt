@@ -16,15 +16,17 @@ else()
 endif()
 
 # OpenMP
-set(OpenMP_FLAGS -fopenmp)
 if(${CMAKE_CXX_COMPILER} STREQUAL clang++)
+  set(OpenMP_FLAGS -fopenmp)
   set(OpenMP_LIBS omp)
+  add_definitions(-Wno-unknown-pragmas -fopenmp)
 elseif(${CMAKE_CXX_COMPILER} STREQUAL g++)
+  set(OpenMP_FLAGS -fopenmp)
   set(OpenMP_LIBS gomp)
+  add_definitions(-Wno-unknown-pragmas -fopenmp)
 else()
   message("Unrecognized C++ compiler: ${CMAKE_CXX_COMPILER}")
 endif()
-  add_definitions(-Wno-unknown-pragmas -fopenmp)
 
 cs_add_library(${PROJECT_NAME}
   src/depth_segmentation.cpp
