@@ -16,13 +16,15 @@ else()
 endif()
 
 # OpenMP
-# Adapted from http://wiki.ros.org/catkin/migrating_from_rosbuild
-if(OPENMP_FOUND)
-  message(STATUS "OpenMP found! cxx_flags: ${OpenMP_CXX_FLAGS} libs: ${OpenMP_LIBS}")
-  set(OpenMP_FLAGS ${OpenMP_CXX_FLAGS})
+set(OpenMP_FLAGS -fopenmp)
+if(${CMAKE_CXX_COMPILER} STREQUAL clang++)
+  set(OpenMP_LIBS omp)
+elseif(${CMAKE_CXX_COMPILER} STREQUAL g++)
   set(OpenMP_LIBS gomp)
-  add_definitions(-Wno-unknown-pragmas ${OpenMP_FLAGS})
+else()
+  message("Unrecognized C++ compiler: ${CMAKE_CXX_COMPILER}")
 endif()
+  add_definitions(-Wno-unknown-pragmas -fopenmp)
 
 cs_add_library(${PROJECT_NAME}
   src/depth_segmentation.cpp
