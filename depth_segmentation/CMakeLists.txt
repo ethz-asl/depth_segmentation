@@ -16,16 +16,18 @@ else()
 endif()
 
 # OpenMP
-if(${CMAKE_CXX_COMPILER} STREQUAL clang++)
+if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
   set(OpenMP_FLAGS -fopenmp)
   set(OpenMP_LIBS omp)
   add_definitions(-Wno-unknown-pragmas -fopenmp)
-elseif(${CMAKE_CXX_COMPILER} STREQUAL g++)
+  message("Compiling with openMP support: ${CMAKE_CXX_COMPILER} ID: ${CMAKE_CXX_COMPILER_ID}")
+elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
   set(OpenMP_FLAGS -fopenmp)
   set(OpenMP_LIBS gomp)
   add_definitions(-Wno-unknown-pragmas -fopenmp)
+  message("Compiling with openMP support: ${CMAKE_CXX_COMPILER} ID: ${CMAKE_CXX_COMPILER_ID}")
 else()
-  message("Unrecognized C++ compiler: ${CMAKE_CXX_COMPILER}")
+  message("Unrecognized C++ compiler: ${CMAKE_CXX_COMPILER} ID: ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
 cs_add_library(${PROJECT_NAME}
