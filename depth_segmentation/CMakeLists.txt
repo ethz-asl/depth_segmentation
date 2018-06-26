@@ -16,12 +16,16 @@ else()
 endif()
 
 # OpenMP
-# Adapted from http://wiki.ros.org/catkin/migrating_from_rosbuild
-if(OPENMP_FOUND)
-  message(STATUS "OpenMP found! cxx_flags: ${OpenMP_CXX_FLAGS} libs: ${OpenMP_LIBS}")
-  set(OpenMP_FLAGS ${OpenMP_CXX_FLAGS})
+if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
+  set(OpenMP_FLAGS -fopenmp)
+  set(OpenMP_LIBS omp)
+  add_definitions(-Wno-unknown-pragmas -fopenmp)
+elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
+  set(OpenMP_FLAGS -fopenmp)
   set(OpenMP_LIBS gomp)
-  add_definitions(-Wno-unknown-pragmas ${OpenMP_FLAGS})
+  add_definitions(-Wno-unknown-pragmas -fopenmp)
+else()
+  message("Unrecognized C++ compiler: ${CMAKE_CXX_COMPILER} ID: ${CMAKE_CXX_COMPILER_ID}. Compiling without openMP support.")
 endif()
 
 cs_add_library(${PROJECT_NAME}
