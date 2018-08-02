@@ -13,20 +13,20 @@ if(APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 else()
   catkin_simple(ALL_DEPS_REQUIRED)
+  # OpenMP
+  if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
+    set(OpenMP_FLAGS -fopenmp)
+    set(OpenMP_LIBS omp)
+    add_definitions(-Wno-unknown-pragmas -fopenmp)
+  elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
+    set(OpenMP_FLAGS -fopenmp)
+    set(OpenMP_LIBS gomp)
+    add_definitions(-Wno-unknown-pragmas -fopenmp)
+  else()
+    message("Unrecognized C++ compiler: ${CMAKE_CXX_COMPILER} ID: ${CMAKE_CXX_COMPILER_ID}. Compiling without openMP support.")
+  endif()
 endif()
 
-# OpenMP
-if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
-  set(OpenMP_FLAGS -fopenmp)
-  set(OpenMP_LIBS omp)
-  add_definitions(-Wno-unknown-pragmas -fopenmp)
-elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
-  set(OpenMP_FLAGS -fopenmp)
-  set(OpenMP_LIBS gomp)
-  add_definitions(-Wno-unknown-pragmas -fopenmp)
-else()
-  message("Unrecognized C++ compiler: ${CMAKE_CXX_COMPILER} ID: ${CMAKE_CXX_COMPILER_ID}. Compiling without openMP support.")
-endif()
 
 cs_add_library(${PROJECT_NAME}
   src/depth_segmentation.cpp
