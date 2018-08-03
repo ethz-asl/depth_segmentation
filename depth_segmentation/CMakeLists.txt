@@ -7,7 +7,7 @@ find_package(catkin_simple REQUIRED)
 
 if(APPLE)
   catkin_simple()
-  find_package(LLVM HINTS /usr/local/Cellar/)
+  find_package(LLVM HINTS /usr/local/opt/llvm/lib/cmake/llvm)
   if (LLVM_FOUND)
     set(CMAKE_C_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang)
     set(CMAKE_CXX_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang++)
