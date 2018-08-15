@@ -151,9 +151,9 @@ class DepthSegmenter {
                            const cv::Mat& discontinuity_map, cv::Mat* edge_map);
   void edgeMap(const cv::Mat& image, cv::Mat* edge_map);
   void labelMap(const cv::Mat& rgb_image, const cv::Mat& depth_image,
-                const cv::Mat& depth_map, const cv::Mat& edge_map,
-                const cv::Mat& normal_map, cv::Mat* labeled_map,
-                std::vector<cv::Mat>* segment_masks,
+                const cv::Mat& label_image, const cv::Mat& depth_map,
+                const cv::Mat& edge_map, const cv::Mat& normal_map,
+                cv::Mat* labeled_map, std::vector<cv::Mat>* segment_masks,
                 std::vector<Segment>* segments);
   void inpaintImage(const cv::Mat& depth_image, const cv::Mat& edge_map,
                     const cv::Mat& label_map, cv::Mat* inpainted);

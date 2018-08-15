@@ -721,12 +721,14 @@ void DepthSegmenter::generateRandomColorsAndLabels(
 
 void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                               const cv::Mat& depth_image,
+                              const cv::Mat& label_image,
                               const cv::Mat& depth_map, const cv::Mat& edge_map,
                               const cv::Mat& normal_map, cv::Mat* labeled_map,
                               std::vector<cv::Mat>* segment_masks,
                               std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
+  CHECK(!label_image.empty());
   CHECK_EQ(depth_image.type(), CV_32FC1);
   CHECK(!edge_map.empty());
   CHECK_EQ(edge_map.type(), CV_32FC1);
@@ -734,6 +736,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   CHECK_EQ(normal_map.type(), CV_32FC3);
   CHECK_EQ(depth_image.size(), edge_map.size());
   CHECK_EQ(depth_image.size(), depth_map.size());
+  CHECK_EQ(depth_image.size(), label_image.size());
   CHECK_NOTNULL(labeled_map);
   CHECK_NOTNULL(segment_masks);
   CHECK_NOTNULL(segments)->clear();
@@ -939,6 +942,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       break;
     }
   }
+
   // Remove small segments from segments vector.
   for (size_t i = 0u; i < segments->size();) {
     if ((*segments)[i].points.size() < params_.label.min_size) {
@@ -949,6 +953,39 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     }
   }
 
+  for (size_t i = 0u; i < segments->size(); ++i) {
+    cv::Mat outputImage;
+    // rgb_image.copyTo(outputImage, (*segment_masks)[i]);
+    // cv::namedWindow("Display window",
+    //                 cv::WINDOW_AUTOSIZE);       // Create a window for
+    //                 display.
+    // cv::imshow("Display window", outputImage);  // Show our image inside it.
+    label_image.copyTo(outputImage, (*segment_masks)[i]);
+    // cv::namedWindow("Display windoww",
+    //                 cv::WINDOW_AUTOSIZE);        // Create a window for
+    //                 display.
+    // cv::imshow("Display windoww", outputImage);  // Show our image inside it.
+
+    cv::Mat hist;
+    int histSize = 151;
+    float range[] = {0, 151};
+    int channels[] = {0};
+    const float* histRange = {range};
+    cv::calcHist(&label_image, 1, channels, (*segment_masks)[i], hist, 1,
+                 &histSize, &histRange,
+                 true,  // the histogram is uniform
+                 false);
+
+    std::cout << "hist = " << std::endl
+              << " " << hist << std::endl
+              << std::endl;
+    cv::Point maxLoc;
+    cv::minMaxLoc(hist, 0, 0, 0, &maxLoc);
+    LOG(ERROR) << "Segment class is: " << maxLoc.y;
+    (*segments)[i].semantic_label.insert(maxLoc.y);
+    // cv::waitKey(0);
+  }
+
   if (params_.label.use_inpaint) {
     inpaintImage(depth_image, edge_map, output, &output);
   }
@@ -957,12 +994,13 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     static const std::string kWindowName = "LabelMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     imshow(kWindowName, output);
-    cv::waitKey(1);
+    cv::waitKey(10);
   }
   *labeled_map = output;
 }
 
 void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
+                        const cv::Mat& label_image,
                         const cv::Mat& depth_intrinsics,
                         depth_segmentation::Params& params, cv::Mat* label_map,
                         cv::Mat* normal_map,
@@ -1039,8 +1077,9 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   cv::Mat remove_no_values = cv::Mat::zeros(edge_map.size(), edge_map.type());
   edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
   edge_map = remove_no_values;
-  depth_segmenter.labelMap(rgb_image, rescaled_depth, depth_map, edge_map,
-                           *normal_map, label_map, segment_masks, segments);
+  depth_segmenter.labelMap(rgb_image, rescaled_depth, label_image, depth_map,
+                           edge_map, *normal_map, label_map, segment_masks,
+                           segments);
 }
 
 }  // namespace depth_segmentation

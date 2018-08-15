@@ -23,7 +23,25 @@
 #include "depth_segmentation/depth_segmentation.h"
 #include "depth_segmentation/ros_common.h"
 
-typedef pcl::PointSurfel PointType;
+// typedef pcl::PointSurfel PointType;
+
+struct PointSurfelLabel {
+  PCL_ADD_POINT4D;
+  PCL_ADD_NORMAL4D;
+  PCL_ADD_RGB;
+  uint8_t label;
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+} EIGEN_ALIGN16;
+
+POINT_CLOUD_REGISTER_POINT_STRUCT(
+    PointSurfelLabel,
+    (float, x, x)(float, y, y)(float, z, z)(float, normal_x, normal_x)(
+        float, normal_y, normal_y)(float, normal_z,
+                                   normal_z)(float, rgb, rgb)(uint8_t, label,
+                                                              label))
+
+typedef PointSurfelLabel PointType;
 
 class DepthSegmentationNode {
  public:
@@ -32,14 +50,14 @@ class DepthSegmentationNode {
         image_transport_(node_handle_),
         camera_info_ready_(false),
         depth_image_sub_(image_transport_, depth_segmentation::kDepthImageTopic,
-                         1),
+                         100),
         rgb_image_sub_(image_transport_, depth_segmentation::kRgbImageTopic, 1),
         label_image_sub_(image_transport_, depth_segmentation::kLabelImageTopic,
-                         1),
+                         100),
         depth_info_sub_(node_handle_, depth_segmentation::kDepthCameraInfoTopic,
-                        1),
+                        100),
         rgb_info_sub_(node_handle_, depth_segmentation::kRgbCameraInfoTopic, 1),
-        image_sync_policy_(ImageSyncPolicy(10), depth_image_sub_,
+        image_sync_policy_(ImageSyncPolicy(100), depth_image_sub_,
                            rgb_image_sub_, label_image_sub_),
         camera_info_sync_policy_(CameraInfoSyncPolicy(10), depth_info_sub_,
                                  rgb_info_sub_),
@@ -49,7 +67,7 @@ class DepthSegmentationNode {
         camera_tracker_(depth_camera_, rgb_camera_),
         depth_segmenter_(depth_camera_, params_) {
     image_sync_policy_.registerCallback(
-        boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
+        boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2, _3));
     camera_info_sync_policy_.registerCallback(
         boost::bind(&DepthSegmentationNode::cameraInfoCallback, this, _1, _2));
     point_cloud2_segment_pub_ =
@@ -64,8 +82,8 @@ class DepthSegmentationNode {
   image_transport::ImageTransport image_transport_;
   tf::TransformBroadcaster transform_broadcaster_;
 
-  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image,
-                                                          sensor_msgs::Image>
+  typedef message_filters::sync_policies::ApproximateTime<
+      sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::Image>
       ImageSyncPolicy;
   typedef message_filters::sync_policies::ApproximateTime<
       sensor_msgs::CameraInfo, sensor_msgs::CameraInfo>
@@ -87,6 +105,7 @@ class DepthSegmentationNode {
 
   image_transport::SubscriberFilter depth_image_sub_;
   image_transport::SubscriberFilter rgb_image_sub_;
+  image_transport::SubscriberFilter label_image_sub_;
 
   ros::Publisher point_cloud2_segment_pub_;
   ros::Publisher point_cloud2_scene_pub_;
@@ -141,6 +160,7 @@ class DepthSegmentationNode {
         point_pcl.r = segment.original_colors[i][0];
         point_pcl.g = segment.original_colors[i][1];
         point_pcl.b = segment.original_colors[i][2];
+        point_pcl.label = *(segment.semantic_label.begin());
         segment_pcl->push_back(point_pcl);
         scene_pcl->push_back(point_pcl);
       }
@@ -161,7 +181,8 @@ class DepthSegmentationNode {
   }
 
   void imageCallback(const sensor_msgs::Image::ConstPtr& depth_msg,
-                     const sensor_msgs::Image::ConstPtr& rgb_msg) {
+                     const sensor_msgs::Image::ConstPtr& rgb_msg,
+                     const sensor_msgs::Image::ConstPtr& label_msg) {
     if (camera_info_ready_) {
       cv_bridge::CvImagePtr cv_depth_image;
       cv::Mat rescaled_depth;
@@ -184,6 +205,10 @@ class DepthSegmentationNode {
       cv::Mat bw_image(cv_rgb_image->image.size(), CV_8UC1);
 
       cvtColor(cv_rgb_image->image, bw_image, cv::COLOR_RGB2GRAY);
+
+      cv_bridge::CvImagePtr cv_label_image;
+      cv_label_image = cv_bridge::toCvCopy(
+          label_msg, sensor_msgs::image_encodings::TYPE_16UC1);
 
       cv::Mat mask(bw_image.size(), CV_8UC1,
                    cv::Scalar(depth_segmentation::CameraTracker::kImageRange));
@@ -277,8 +302,9 @@ class DepthSegmentationNode {
         std::vector<depth_segmentation::Segment> segments;
         std::vector<cv::Mat> segment_masks;
         depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
-                                  depth_map, edge_map, normal_map, &label_map,
-                                  &segment_masks, &segments);
+                                  cv_label_image->image, depth_map, edge_map,
+                                  normal_map, &label_map, &segment_masks,
+                                  &segments);
         if (segments.size() > 0) {
           publish_segments(segments, depth_msg->header.stamp);
         }
