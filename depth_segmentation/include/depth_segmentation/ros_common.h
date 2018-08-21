@@ -11,8 +11,8 @@ const static std::string kRgbCameraInfoTopic = "/camera/rgb/camera_info";
 const static std::string kDepthImageTopic =
     "/camera/depth_registered/image_raw";
 const static std::string kDepthCameraInfoTopic = "/camera/depth/camera_info";
-const static std::string kLabelImageTopic =
-    "/rgbd_segmentation_node/label_image";
+const static std::string kSegmentationTopic =
+    "/rgbd_segmentation_node/segmentation";
 
 const static std::string kTfWorldFrame = "world";
 const static std::string kTfDepthCameraFrame = "camera_depth_optical_frame";

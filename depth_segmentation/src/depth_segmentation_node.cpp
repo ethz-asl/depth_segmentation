@@ -20,6 +20,8 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include <mask_rcnn_ros/Result.h>
+
 #include "depth_segmentation/depth_segmentation.h"
 #include "depth_segmentation/ros_common.h"
 
@@ -51,14 +53,19 @@ class DepthSegmentationNode {
         camera_info_ready_(false),
         depth_image_sub_(image_transport_, depth_segmentation::kDepthImageTopic,
                          100),
-        rgb_image_sub_(image_transport_, depth_segmentation::kRgbImageTopic, 1),
-        label_image_sub_(image_transport_, depth_segmentation::kLabelImageTopic,
-                         100),
+        rgb_image_sub_(image_transport_, depth_segmentation::kRgbImageTopic,
+                       100),
+        // label_image_sub_(image_transport_,
+        // depth_segmentation::kLabelImageTopic,
+        //                  100),
+        segmentation_result_sub_(node_handle_,
+                                 depth_segmentation::kSegmentationTopic, 1),
         depth_info_sub_(node_handle_, depth_segmentation::kDepthCameraInfoTopic,
                         100),
-        rgb_info_sub_(node_handle_, depth_segmentation::kRgbCameraInfoTopic, 1),
+        rgb_info_sub_(node_handle_, depth_segmentation::kRgbCameraInfoTopic,
+                      100),
         image_sync_policy_(ImageSyncPolicy(100), depth_image_sub_,
-                           rgb_image_sub_, label_image_sub_),
+                           rgb_image_sub_, segmentation_result_sub_),
         camera_info_sync_policy_(CameraInfoSyncPolicy(10), depth_info_sub_,
                                  rgb_info_sub_),
         depth_camera_(),
@@ -82,8 +89,11 @@ class DepthSegmentationNode {
   image_transport::ImageTransport image_transport_;
   tf::TransformBroadcaster transform_broadcaster_;
 
+  // typedef message_filters::sync_policies::ApproximateTime<
+  //     sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::Image>
+  //     ImageSyncPolicy;
   typedef message_filters::sync_policies::ApproximateTime<
-      sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::Image>
+      sensor_msgs::Image, sensor_msgs::Image, mask_rcnn_ros::Result>
       ImageSyncPolicy;
   typedef message_filters::sync_policies::ApproximateTime<
       sensor_msgs::CameraInfo, sensor_msgs::CameraInfo>
@@ -102,10 +112,12 @@ class DepthSegmentationNode {
  private:
   message_filters::Subscriber<sensor_msgs::CameraInfo> depth_info_sub_;
   message_filters::Subscriber<sensor_msgs::CameraInfo> rgb_info_sub_;
+  message_filters::Subscriber<mask_rcnn_ros::Result> segmentation_result_sub_;
 
   image_transport::SubscriberFilter depth_image_sub_;
   image_transport::SubscriberFilter rgb_image_sub_;
-  image_transport::SubscriberFilter label_image_sub_;
+  // image_transport::SubscriberFilter label_image_sub_;
+  // image_transport::SubscriberFilter segmentation_result_sub_;
 
   ros::Publisher point_cloud2_segment_pub_;
   ros::Publisher point_cloud2_scene_pub_;
@@ -160,7 +172,10 @@ class DepthSegmentationNode {
         point_pcl.r = segment.original_colors[i][0];
         point_pcl.g = segment.original_colors[i][1];
         point_pcl.b = segment.original_colors[i][2];
-        point_pcl.label = *(segment.semantic_label.begin());
+        if (segment.semantic_label.size() > 0) {
+          point_pcl.label = *(segment.semantic_label.begin());
+        }
+
         segment_pcl->push_back(point_pcl);
         scene_pcl->push_back(point_pcl);
       }
@@ -180,9 +195,26 @@ class DepthSegmentationNode {
     point_cloud2_scene_pub_.publish(pcl2_msg);
   }
 
+  void segmentationFromROSMsg(
+      const mask_rcnn_ros::Result::ConstPtr& segmentation_msg,
+      depth_segmentation::Segmentation* segmentation) {
+    segmentation->masks.reserve(segmentation_msg->masks.size());
+    segmentation->labels.reserve(segmentation_msg->masks.size());
+    for (int i = 0; i < segmentation_msg->masks.size(); ++i) {
+      cv_bridge::CvImagePtr cv_mask_image;
+      cv_mask_image = cv_bridge::toCvCopy(segmentation_msg->masks[i],
+                                          sensor_msgs::image_encodings::MONO8);
+      segmentation->masks.push_back(cv_mask_image->image.clone());
+      segmentation->labels.push_back(segmentation_msg->class_ids[i]);
+    }
+  }
+  // void imageCallback(const sensor_msgs::Image::ConstPtr& depth_msg,
+  //                    const sensor_msgs::Image::ConstPtr& rgb_msg,
+  //                    const sensor_msgs::Image::ConstPtr& label_msg) {
+
   void imageCallback(const sensor_msgs::Image::ConstPtr& depth_msg,
                      const sensor_msgs::Image::ConstPtr& rgb_msg,
-                     const sensor_msgs::Image::ConstPtr& label_msg) {
+                     const mask_rcnn_ros::Result::ConstPtr& segmentation_msg) {
     if (camera_info_ready_) {
       cv_bridge::CvImagePtr cv_depth_image;
       cv::Mat rescaled_depth;
@@ -206,9 +238,11 @@ class DepthSegmentationNode {
 
       cvtColor(cv_rgb_image->image, bw_image, cv::COLOR_RGB2GRAY);
 
-      cv_bridge::CvImagePtr cv_label_image;
-      cv_label_image = cv_bridge::toCvCopy(
-          label_msg, sensor_msgs::image_encodings::TYPE_16UC1);
+      // cv_bridge::CvImagePtr cv_label_image;
+      // cv_label_image = cv_bridge::toCvCopy(
+      //     label_msg, sensor_msgs::image_encodings::TYPE_16UC1);
+      depth_segmentation::Segmentation segmentation;
+      segmentationFromROSMsg(segmentation_msg, &segmentation);
 
       cv::Mat mask(bw_image.size(), CV_8UC1,
                    cv::Scalar(depth_segmentation::CameraTracker::kImageRange));
@@ -302,9 +336,8 @@ class DepthSegmentationNode {
         std::vector<depth_segmentation::Segment> segments;
         std::vector<cv::Mat> segment_masks;
         depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
-                                  cv_label_image->image, depth_map, edge_map,
-                                  normal_map, &label_map, &segment_masks,
-                                  &segments);
+                                  segmentation, depth_map, edge_map, normal_map,
+                                  &label_map, &segment_masks, &segments);
         if (segments.size() > 0) {
           publish_segments(segments, depth_msg->header.stamp);
         }
