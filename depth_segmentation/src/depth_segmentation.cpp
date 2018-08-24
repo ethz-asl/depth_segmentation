@@ -960,15 +960,16 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     int max_mask_overlap = 0;
     segment_count = cv::countNonZero((*segment_masks)[i]);
 
+    cv::Mat outputImage;
+    rgb_image.copyTo(outputImage, (*segment_masks)[i]);
+    cv::namedWindow("Display windoww",
+                    cv::WINDOW_AUTOSIZE);  // Create a window for display.
+    cv::imshow("Display windoww",
+               outputImage);  // Show our image inside it.
+
     for (size_t j = 0u; j < instance_segmentation.masks.size(); ++j) {
-      mask_count = cv::countNonZero(instance_segmentation.masks[j]);
       // Find the mask overlapping the most.
-      // cv::Mat outputImage;
-      // rgb_image.copyTo(outputImage, (*segment_masks)[i]);
-      // cv::namedWindow("Display windoww",
-      //                 cv::WINDOW_AUTOSIZE);  // Create a window for display.
-      // cv::imshow("Display windoww",
-      //            outputImage);  // Show our image inside it.
+      mask_count = cv::countNonZero(instance_segmentation.masks[j]);
 
       cv::Mat masks_and;
       cv::bitwise_and((*segment_masks)[i], instance_segmentation.masks[j],
@@ -994,7 +995,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     } else {
       LOG(ERROR) << "Segment has no class.";
     }
-    // cv::waitKey(0);
+    cv::waitKey(0);
   }
 
   // for (size_t i = 0u; i < segments->size(); ++i) {
