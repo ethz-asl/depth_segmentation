@@ -980,7 +980,8 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
 
         float mask_overlap = (float)overlap_count / (float)mask_count;
         float segment_overlap = (float)overlap_count / (float)segment_count;
-        if (overlap_count > max_mask_overlap && segment_overlap > 0.7f) {
+        if (overlap_count > max_mask_overlap && segment_overlap > 0.8f &&
+            mask_overlap > 0.2f) {
           mask_index = j;
           max_mask_overlap = overlap_count;
           LOG(ERROR) << "Mask overlap " << mask_overlap;
