@@ -953,6 +953,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     }
   }
 
+  // Instance stuff.
   int segment_count;
   int mask_count;
   for (size_t i = 0u; i < segments->size(); ++i) {
@@ -970,67 +971,42 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     for (size_t j = 0u; j < instance_segmentation.masks.size(); ++j) {
       // Find the mask overlapping the most.
       mask_count = cv::countNonZero(instance_segmentation.masks[j]);
+      if (mask_count > 2500) {
+        cv::Mat masks_and;
+        cv::bitwise_and((*segment_masks)[i], instance_segmentation.masks[j],
+                        masks_and);
 
-      cv::Mat masks_and;
-      cv::bitwise_and((*segment_masks)[i], instance_segmentation.masks[j],
-                      masks_and);
+        int overlap_count = cv::countNonZero(masks_and);
 
-      int overlap_count = cv::countNonZero(masks_and);
-
-      float mask_overlap = (float)overlap_count / (float)mask_count;
-      float segment_overlap = (float)overlap_count / (float)segment_count;
-      if (overlap_count > max_mask_overlap && segment_overlap > 0.05f) {
-        mask_index = j;
-        max_mask_overlap = overlap_count;
+        float mask_overlap = (float)overlap_count / (float)mask_count;
+        float segment_overlap = (float)overlap_count / (float)segment_count;
+        if (overlap_count > max_mask_overlap && segment_overlap > 0.7f) {
+          mask_index = j;
+          max_mask_overlap = overlap_count;
+          LOG(ERROR) << "Mask overlap " << mask_overlap;
+          LOG(ERROR) << "Segment overlap " << segment_overlap;
+        }
       }
-      // Compute percentage of the total mask size or segment size.
     }
     if (max_mask_overlap > 0) {
-      LOG(ERROR) << "Segment has class: "
-                 << instance_segmentation.labels[mask_index];
+      // const std::string classes[] = {"BG",      "Unknown", "Bed",   "Books",
+      //                                "Ceiling", "Chair",   "Floor",
+      //                                "Furniture", "Objects", "Picture",
+      //                                "Sofa",  "Table", "TV",      "Wall",
+      //                                "Window"};
+      // LOG(ERROR) << "Segment has class: "
+      //            << classes[instance_segmentation.labels[mask_index]];
+
       (*segments)[i].semantic_label.insert(
           instance_segmentation.labels[mask_index]);
-      if (instance_segmentation.labels[mask_index] == 0)
-        LOG(FATAL) << "LABEL 0!";
+      (*segments)[i].instance_label.insert(mask_index + 1u);
+      // if (instance_segmentation.labels[mask_index] == 0)
+      //   LOG(FATAL) << "LABEL 0! Background object detected.";
     } else {
       LOG(ERROR) << "Segment has no class.";
     }
-    cv::waitKey(0);
+    // cv::waitKey(0);
   }
-
-  // for (size_t i = 0u; i < segments->size(); ++i) {
-  //   cv::Mat outputImage;
-  //   // rgb_image.copyTo(outputImage, (*segment_masks)[i]);
-  //   // cv::namedWindow("Display window",
-  //   //                 cv::WINDOW_AUTOSIZE);       // Create a window for
-  //   //                 display.
-  //   // cv::imshow("Display window", outputImage);  // Show our image inside
-  //   it. label_image.copyTo(outputImage, (*segment_masks)[i]);
-  //   // cv::namedWindow("Display windoww",
-  //   //                 cv::WINDOW_AUTOSIZE);        // Create a window for
-  //   //                 display.
-  //   // cv::imshow("Display windoww", outputImage);  // Show our image inside
-  //   it.
-  //
-  //   cv::Mat hist;
-  //   int histSize = 151;
-  //   float range[] = {0, 151};
-  //   int channels[] = {0};
-  //   const float* histRange = {range};
-  //   cv::calcHist(&label_image, 1, channels, (*segment_masks)[i], hist, 1,
-  //                &histSize, &histRange,
-  //                true,  // the histogram is uniform
-  //                false);
-  //
-  //   std::cout << "hist = " << std::endl
-  //             << " " << hist << std::endl
-  //             << std::endl;
-  //   cv::Point maxLoc;
-  //   cv::minMaxLoc(hist, 0, 0, 0, &maxLoc);
-  //   LOG(ERROR) << "Segment class is: " << maxLoc.y;
-  //   (*segments)[i].semantic_label.insert(maxLoc.y);
-  //   // cv::waitKey(0);
-  // }
 
   if (params_.label.use_inpaint) {
     inpaintImage(depth_image, edge_map, output, &output);

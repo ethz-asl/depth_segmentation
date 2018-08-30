@@ -32,6 +32,7 @@ struct PointSurfelLabel {
   PCL_ADD_NORMAL4D;
   PCL_ADD_RGB;
   uint8_t label;
+  uint8_t instance;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
@@ -39,9 +40,8 @@ struct PointSurfelLabel {
 POINT_CLOUD_REGISTER_POINT_STRUCT(
     PointSurfelLabel,
     (float, x, x)(float, y, y)(float, z, z)(float, normal_x, normal_x)(
-        float, normal_y, normal_y)(float, normal_z,
-                                   normal_z)(float, rgb, rgb)(uint8_t, label,
-                                                              label))
+        float, normal_y, normal_y)(float, normal_z, normal_z)(float, rgb, rgb)(
+        uint8_t, label, label)(uint8_t, instance, instance))
 
 typedef PointSurfelLabel PointType;
 
@@ -64,7 +64,7 @@ class DepthSegmentationNode {
                         100),
         rgb_info_sub_(node_handle_, depth_segmentation::kRgbCameraInfoTopic,
                       100),
-        image_sync_policy_(ImageSyncPolicy(100), depth_image_sub_,
+        image_sync_policy_(ImageSyncPolicy(10), depth_image_sub_,
                            rgb_image_sub_, segmentation_result_sub_),
         camera_info_sync_policy_(CameraInfoSyncPolicy(10), depth_info_sub_,
                                  rgb_info_sub_),
@@ -89,9 +89,6 @@ class DepthSegmentationNode {
   image_transport::ImageTransport image_transport_;
   tf::TransformBroadcaster transform_broadcaster_;
 
-  // typedef message_filters::sync_policies::ApproximateTime<
-  //     sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::Image>
-  //     ImageSyncPolicy;
   typedef message_filters::sync_policies::ApproximateTime<
       sensor_msgs::Image, sensor_msgs::Image, mask_rcnn_ros::Result>
       ImageSyncPolicy;
@@ -175,6 +172,10 @@ class DepthSegmentationNode {
         if (segment.semantic_label.size() > 0) {
           point_pcl.label = *(segment.semantic_label.begin());
         }
+        if (segment.instance_label.size() > 0) {
+          point_pcl.instance = *(segment.instance_label.begin());
+        }
+        // LOG(ERROR) << "Segment instance: " << unsigned(point_pcl.instance);
 
         segment_pcl->push_back(point_pcl);
         scene_pcl->push_back(point_pcl);
