@@ -762,7 +762,9 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       for (size_t i = 0u; i < contours.size(); ++i) {
         const double area = cv::contourArea(contours[i]);
         constexpr int kNoParentContour = -1;
-        if (area < params_.label.min_size) {
+        constexpr bool kContourIsClosed = true;
+        if (area < params_.label.min_size ||
+            cv::arcLength(contours[i], kContourIsClosed) >= 0.3 * area) {
           if (hierarchy[i][3] == kNoParentContour) {
             // Assign black color to areas that have no parent contour.
             colors[i] = cv::Scalar(0, 0, 0);
@@ -784,10 +786,12 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
         drawContours(output_labels, contours, i, cv::Scalar(labels[i]),
                      CV_FILLED, 8, hierarchy);
 
-        drawContours(output, contours, i, cv::Scalar(0, 0, 0), 2, 8, hierarchy);
-        drawContours(output_labels, contours, i, cv::Scalar(-1), 2, 8,
-                     hierarchy);
-        drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 2, 8, hierarchy);
+        // drawContours(output, contours, i, cv::Scalar(0, 0, 0), 2, 8,
+        // hierarchy); drawContours(output_labels, contours, i, cv::Scalar(-1),
+        // 2, 8,
+        //              hierarchy);
+        // drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 2, 8,
+        // hierarchy);
       }
 
       output.setTo(cv::Scalar(0, 0, 0), edge_map_8u == 0u);
@@ -961,17 +965,10 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     int max_mask_overlap = 0;
     segment_count = cv::countNonZero((*segment_masks)[i]);
 
-    cv::Mat outputImage;
-    rgb_image.copyTo(outputImage, (*segment_masks)[i]);
-    cv::namedWindow("Display windoww",
-                    cv::WINDOW_AUTOSIZE);  // Create a window for display.
-    cv::imshow("Display windoww",
-               outputImage);  // Show our image inside it.
-
     for (size_t j = 0u; j < instance_segmentation.masks.size(); ++j) {
       // Find the mask overlapping the most.
       mask_count = cv::countNonZero(instance_segmentation.masks[j]);
-      if (mask_count > 2500) {
+      if (mask_count > 0) {
         cv::Mat masks_and;
         cv::bitwise_and((*segment_masks)[i], instance_segmentation.masks[j],
                         masks_and);
@@ -984,8 +981,8 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
             mask_overlap > 0.2f) {
           mask_index = j;
           max_mask_overlap = overlap_count;
-          LOG(ERROR) << "Mask overlap " << mask_overlap;
-          LOG(ERROR) << "Segment overlap " << segment_overlap;
+          // LOG(ERROR) << "Mask overlap " << mask_overlap;
+          // LOG(ERROR) << "Segment overlap " << segment_overlap;
         }
       }
     }
@@ -1004,7 +1001,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       // if (instance_segmentation.labels[mask_index] == 0)
       //   LOG(FATAL) << "LABEL 0! Background object detected.";
     } else {
-      LOG(ERROR) << "Segment has no class.";
+      // LOG(ERROR) << "Segment has no class.";
     }
     // cv::waitKey(0);
   }
