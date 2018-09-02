@@ -763,8 +763,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
         const double area = cv::contourArea(contours[i]);
         constexpr int kNoParentContour = -1;
         constexpr bool kContourIsClosed = true;
-        if (area < params_.label.min_size ||
-            cv::arcLength(contours[i], kContourIsClosed) >= 0.3 * area) {
+        if (area < params_.label.min_size) {
           if (hierarchy[i][3] == kNoParentContour) {
             // Assign black color to areas that have no parent contour.
             colors[i] = cv::Scalar(0, 0, 0);
@@ -778,6 +777,9 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
           }
         }
       }
+      cv::namedWindow("edge", cv::WINDOW_AUTOSIZE);
+      imshow("edge", edge_map_8u * 100);
+
       cv::Mat output_labels =
           cv::Mat(depth_image.size(), CV_32SC1, cv::Scalar(0));
       for (size_t i = 0u; i < contours.size(); ++i) {
@@ -785,13 +787,10 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                      hierarchy);
         drawContours(output_labels, contours, i, cv::Scalar(labels[i]),
                      CV_FILLED, 8, hierarchy);
-
-        // drawContours(output, contours, i, cv::Scalar(0, 0, 0), 2, 8,
-        // hierarchy); drawContours(output_labels, contours, i, cv::Scalar(-1),
-        // 2, 8,
-        //              hierarchy);
-        // drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 2, 8,
-        // hierarchy);
+        drawContours(output, contours, i, cv::Scalar(0, 0, 0), 3, 8, hierarchy);
+        drawContours(output_labels, contours, i, cv::Scalar(-1), 3, 8,
+                     hierarchy);
+        drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 3, 8, hierarchy);
       }
 
       output.setTo(cv::Scalar(0, 0, 0), edge_map_8u == 0u);
