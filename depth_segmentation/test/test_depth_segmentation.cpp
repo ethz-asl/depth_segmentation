@@ -32,6 +32,63 @@ class DepthSegmentationTest : public ::testing::Test {
   DepthSegmenter depth_segmenter_;
 };
 
+TEST_F(DepthSegmentationTest, testNeighborhood) {
+  static constexpr size_t kNormalImageWidth = 4u;
+  static constexpr size_t kNormalImageHeight = 3u;
+  cv::Size image_size(kNormalImageWidth, kNormalImageHeight);
+  cv::Mat normals(image_size, CV_32FC3);
+  cv::Mat expected_normals(image_size, CV_32FC3);
+  cv::Mat depth_map(image_size, CV_32FC3);
+  cv::Vec3f xz_to_left_normal;
+  xz_to_left_normal[0] = -cv::sqrt(2.0) / 2.0f;
+  xz_to_left_normal[1] = 0.0f;
+  xz_to_left_normal[2] = -cv::sqrt(2.0) / 2.0f;
+
+  const float fx = depth_camera_.getCameraMatrix().at<float>(0, 0);
+  const float fy = depth_camera_.getCameraMatrix().at<float>(1, 1);
+  const float cx = depth_camera_.getCameraMatrix().at<float>(0, 2);
+  const float cy = depth_camera_.getCameraMatrix().at<float>(1, 2);
+
+  const float kZMinDistance = 2.0f;
+  const float kZStep = 1.0f / fx;
+
+  float z_distance = kZMinDistance;
+  constexpr float kFloatNan = std::numeric_limits<float>::quiet_NaN();
+
+  for (size_t y = 0u; y < kNormalImageHeight; ++y) {
+    z_distance = kZMinDistance;
+    for (size_t x = 0u; x < kNormalImageWidth; ++x) {
+      depth_map.at<cv::Vec3f>(y, x) = cv::Vec3f(1, 1, 1);
+      // Assign some nans once in a while.
+      if ((x + kNormalImageWidth * y) % 7 == 0) {
+        depth_map.at<cv::Vec3f>(y, x) =
+            cv::Vec3f(kFloatNan, kFloatNan, kFloatNan);
+      }
+    }
+  }
+  std::vector<size_t> expected_sizes = {5u, 5u, 3u, 5u, 8u, 8u, 4u, 6u, 5u, 3u};
+  float max_distance = 0.1;
+  size_t window_size = 3;
+  size_t i = 0u;
+  for (size_t y = 0u; y < depth_map.rows; ++y) {
+    for (size_t x = 0u; x < depth_map.cols; ++x) {
+      if (cvIsNaN(depth_map.at<cv::Vec3f>(y, x)[0]) ||
+          cvIsNaN(depth_map.at<cv::Vec3f>(y, x)[1]) ||
+          cvIsNaN(depth_map.at<cv::Vec3f>(y, x)[2]) ||
+          (depth_map.at<cv::Vec3f>(y, x)[2] == 0.0)) {
+        continue;
+      }
+      cv::Vec3f mean = cv::Vec3f(0.0f, 0.0f, 0.0f);
+      cv::Mat neighborhood =
+          cv::Mat::zeros(3, window_size * window_size, CV_32FC1);
+      const size_t neighborhood_size = findNeighborhood(
+          depth_map, window_size, max_distance, x, y, &neighborhood, &mean);
+      EXPECT_EQ(neighborhood_size, expected_sizes[i]);
+      ++i;
+    }
+  }
+}
+
 TEST_F(DepthSegmentationTest, testNormals) {
   static constexpr size_t kNormalImageWidth = 640u;
   static constexpr size_t kNormalImageHeight = 480u;
@@ -65,6 +122,7 @@ TEST_F(DepthSegmentationTest, testNormals) {
   const float kZStep = 1.0f / fx;
 
   float z_distance = kZMinDistance;
+  constexpr float kFloatNan = std::numeric_limits<float>::quiet_NaN();
 
   for (size_t y = 0u; y < kNormalImageHeight; ++y) {
     z_distance = kZMinDistance;
@@ -80,6 +138,13 @@ TEST_F(DepthSegmentationTest, testNormals) {
         expected_normals.at<cv::Vec3f>(y, x) = xz_to_left_normal;
         z_distance -= kZStep;
       }
+      // Assign some nans once in a while.
+      if ((x + kNormalImageWidth * y) % 31 == 0) {
+        depth_map.at<cv::Vec3f>(y, x) =
+            cv::Vec3f(kFloatNan, kFloatNan, kFloatNan);
+        expected_normals.at<cv::Vec3f>(y, x) =
+            cv::Vec3f(kFloatNan, kFloatNan, kFloatNan);
+      }
     }
   }
 
@@ -94,12 +159,19 @@ TEST_F(DepthSegmentationTest, testNormals) {
       cv::Vec3f expected_normal = expected_normals.at<cv::Vec3f>(y, x);
       if (x < kNormalImageWidth / 2u) {
         for (size_t k = 0u; k < normals.channels(); ++k) {
-          // Be generous with the normal error at plane intersection.
-          EXPECT_NEAR(normal(k), expected_normal(k), 1.0e-3);
+          if (!cvIsNaN(expected_normal(k))) {
+            // Be generous with the normal error at plane intersection.
+            EXPECT_NEAR(normal(k), expected_normal(k), 1.0e-1)
+                << "Plane intersection \nx: " << x << ", y: " << y
+                << ", k:" << k;
+          }
         }
       } else {
         for (size_t k = 0u; k < normals.channels(); ++k) {
-          EXPECT_NEAR(normal(k), expected_normal(k), 1.0e-5);
+          if (!cvIsNaN(expected_normal(k))) {
+            EXPECT_NEAR(normal(k), expected_normal(k), 1.0e-5)
+                << "x: " << x << ", y: " << y << ", k:" << k;
+          }
         }
       }
     }
