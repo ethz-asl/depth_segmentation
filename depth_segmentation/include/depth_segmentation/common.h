@@ -268,7 +268,10 @@ void computeOwnNormals(const SurfaceNormalParams& params,
     for (size_t x = 0u; x < depth_map.cols; ++x) {
       mid_point = depth_map.at<cv::Vec3f>(y, x);
       // Skip point if z value is nan.
-      if (cvIsNaN(mid_point[2]) || (mid_point[2] == 0.0)) {
+      if (cvIsNaN(mid_point[0]) || cvIsNaN(mid_point[1]) ||
+          cvIsNaN(mid_point[2]) || (mid_point[2] == 0.0)) {
+        normals->at<cv::Vec3f>(y, x) =
+            cv::Vec3f(float_nan, float_nan, float_nan);
         continue;
       }
       const float max_distance =
