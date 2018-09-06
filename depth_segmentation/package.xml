@@ -24,8 +24,10 @@
   <depend>image_transport</depend>
   <depend>mask_rcnn_ros</depend>
   <depend>opencv3_catkin</depend>
-  <depend>OpenMP</depend>
+  <!-- <depend>OpenMP</depend> -->
   <depend>pcl_catkin</depend>
+  <depend>pcl_conversions</depend>
+  <depend>pcl_ros</depend>
   <depend>roscpp</depend>
   <depend>tf</depend>
 </package>

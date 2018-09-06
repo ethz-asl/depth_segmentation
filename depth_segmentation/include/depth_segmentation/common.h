@@ -171,14 +171,12 @@ void computeCovariance(const cv::Mat& neighborhood, const cv::Vec3f& mean,
       point[row] = neighborhood.at<float>(row, i) - mean[row];
     }
 
+    covariance->at<float>(0, 0) += point[0] * point[0];
+    covariance->at<float>(0, 1) += point[0] * point[1];
+    covariance->at<float>(0, 2) += point[0] * point[2];
     covariance->at<float>(1, 1) += point[1] * point[1];
     covariance->at<float>(1, 2) += point[1] * point[2];
     covariance->at<float>(2, 2) += point[2] * point[2];
-
-    point *= point[0];
-    for (size_t row = 0u; row < neighborhood.rows; ++row) {
-      covariance->at<float>(0, row) += point[row];
-    }
   }
   // Assign the symmetric elements of the covariance matrix.
   covariance->at<float>(1, 0) = covariance->at<float>(0, 1);
@@ -271,7 +269,10 @@ void computeOwnNormals(const SurfaceNormalParams& params,
     for (size_t x = 0u; x < depth_map.cols; ++x) {
       mid_point = depth_map.at<cv::Vec3f>(y, x);
       // Skip point if z value is nan.
-      if (cvIsNaN(mid_point[2]) || (mid_point[2] == 0.0)) {
+      if (cvIsNaN(mid_point[0]) || cvIsNaN(mid_point[1]) ||
+          cvIsNaN(mid_point[2]) || (mid_point[2] == 0.0)) {
+        normals->at<cv::Vec3f>(y, x) =
+            cv::Vec3f(float_nan, float_nan, float_nan);
         continue;
       }
       const float max_distance =
