@@ -541,10 +541,15 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
 
     cv::Mat filtered_normal_image = cv::Mat::zeros(normal_map.size(), CV_32FC3);
     cv::filter2D(normal_map, filtered_normal_image, CV_32FC3, normal_kernel);
+    normal_map.copyTo(filtered_normal_image,
+                      filtered_normal_image != filtered_normal_image);
 
     // TODO(ff): Create a function for this mulitplication and projections.
     cv::Mat normal_times_filtered_normal(depth_map.size(), CV_32FC3);
     normal_times_filtered_normal = normal_map.mul(filtered_normal_image);
+    filtered_normal_image.copyTo(
+        normal_times_filtered_normal,
+        normal_times_filtered_normal != normal_times_filtered_normal);
     std::vector<cv::Mat> normal_channels(3);
     cv::split(normal_times_filtered_normal, normal_channels);
     cv::Mat normal_vector_projection(depth_map.size(), CV_32FC1);
