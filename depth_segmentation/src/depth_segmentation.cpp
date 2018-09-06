@@ -765,16 +765,24 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
         const double area = cv::contourArea(contours[i]);
         constexpr int kNoParentContour = -1;
         if (area < params_.label.min_size) {
-          if (hierarchy[i][3] == kNoParentContour) {
+          const int parent_contour = hierarchy[i][3];
+          if (parent_contour == kNoParentContour) {
             // Assign black color to areas that have no parent contour.
             colors[i] = cv::Scalar(0, 0, 0);
             labels[i] = -1;
-            drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 2, 8,
+            drawContours(edge_map_8u, contours, i, cv::Scalar(0u), CV_FILLED, 8,
                          hierarchy);
           } else {
-            // Assign the color of the parent contour.
-            colors[i] = colors[hierarchy[i][3]];
-            labels[i] = labels[hierarchy[i][3]];
+            if (hierarchy[i][0] == -1 && hierarchy[i][1] == -1) {
+              // Assign the color of the parent contour.
+              colors[i] = colors[parent_contour];
+              labels[i] = labels[parent_contour];
+            } else {
+              colors[i] = cv::Scalar(0, 0, 0);
+              labels[i] = -1;
+              drawContours(edge_map_8u, contours, i, cv::Scalar(0u), CV_FILLED,
+                           8, hierarchy);
+            }
           }
         }
       }
@@ -786,10 +794,9 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
         drawContours(output_labels, contours, i, cv::Scalar(labels[i]),
                      CV_FILLED, 8, hierarchy);
 
-        drawContours(output, contours, i, cv::Scalar(0, 0, 0), 2, 8, hierarchy);
-        drawContours(output_labels, contours, i, cv::Scalar(-1), 2, 8,
-                     hierarchy);
-        drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 2, 8, hierarchy);
+        // drawContours(output_labels, contours, i, cv::Scalar(-1), 1, 8,
+        //              hierarchy);
+        drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 1, 8, hierarchy);
       }
 
       output.setTo(cv::Scalar(0, 0, 0), edge_map_8u == 0u);
@@ -843,18 +850,26 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                 const cv::Vec3f filter_point =
                     depth_map.at<cv::Vec3f>(y + j, x + i);
                 const double dist = cv::norm(edge_point - filter_point);
-                const int label_tmp = output_labels.at<int32_t>(y + j, x + i);
+                if (dist >= min_dist) {
+                  continue;
+                }
                 const bool filter_point_is_edge_point =
                     edge_map_8u.at<uint8_t>(y + j, x + i) == 0u &&
                     depth_image.at<float>(y + j, x + i) > 0.0f;
-                if (dist < min_dist && label_tmp >= 0 &&
-                    !filter_point_is_edge_point) {
+                if (!filter_point_is_edge_point) {
+                  const int label_tmp = output_labels.at<int32_t>(y + j, x + i);
+                  if (label_tmp < 0) {
+                    continue;
+                  }
+                  // CHECK_GE(label_tmp, 0);
                   min_dist = dist;
                   label = label_tmp;
+                  output_labels.at<int32_t>(y, x) = label;
+                  // LOG(ERROR) << label_tmp;
                 }
               }
             }
-            if (label >= 0) {
+            if (label > 0) {
               output.at<cv::Vec3b>(y, x) = cv::Vec3b(
                   colors[label][0], colors[label][1], colors[label][2]);
             }
