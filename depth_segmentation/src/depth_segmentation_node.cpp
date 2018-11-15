@@ -64,7 +64,7 @@ class DepthSegmentationNode {
                         100),
         rgb_info_sub_(node_handle_, depth_segmentation::kRgbCameraInfoTopic,
                       100),
-        image_sync_policy_(ImageSyncPolicy(10), depth_image_sub_,
+        image_sync_policy_(ImageSyncPolicy(30), depth_image_sub_,
                            rgb_image_sub_, segmentation_result_sub_),
         camera_info_sync_policy_(CameraInfoSyncPolicy(10), depth_info_sub_,
                                  rgb_info_sub_),
@@ -171,10 +171,15 @@ class DepthSegmentationNode {
         point_pcl.b = segment.original_colors[i][2];
         if (segment.semantic_label.size() > 0) {
           point_pcl.label = *(segment.semantic_label.begin());
+        } else {
+          point_pcl.label = 0u;
         }
         if (segment.instance_label.size() > 0) {
           point_pcl.instance = *(segment.instance_label.begin());
+        } else {
+          point_pcl.instance = 0u;
         }
+
         // LOG(ERROR) << "Segment instance: " << unsigned(point_pcl.instance);
 
         segment_pcl->push_back(point_pcl);
@@ -234,7 +239,7 @@ class DepthSegmentationNode {
 
       cv_bridge::CvImagePtr cv_rgb_image;
       cv_rgb_image =
-          cv_bridge::toCvCopy(rgb_msg, sensor_msgs::image_encodings::RGB8);
+          cv_bridge::toCvCopy(rgb_msg, sensor_msgs::image_encodings::BGR8);
       cv::Mat bw_image(cv_rgb_image->image.size(), CV_8UC1);
 
       cvtColor(cv_rgb_image->image, bw_image, cv::COLOR_RGB2GRAY);
@@ -337,8 +342,10 @@ class DepthSegmentationNode {
         std::vector<depth_segmentation::Segment> segments;
         std::vector<cv::Mat> segment_masks;
         depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
-                                  segmentation, depth_map, edge_map, normal_map,
-                                  &label_map, &segment_masks, &segments);
+                                  cv_depth_image->image, segmentation,
+                                  depth_map, edge_map, normal_map,
+                                  rgb_msg->header.stamp.toSec(), &label_map,
+                                  &segment_masks, &segments);
         if (segments.size() > 0) {
           publish_segments(segments, depth_msg->header.stamp);
         }

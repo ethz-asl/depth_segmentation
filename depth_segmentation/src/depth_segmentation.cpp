@@ -726,9 +726,11 @@ void DepthSegmenter::generateRandomColorsAndLabels(
 
 void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                               const cv::Mat& depth_image,
+                              const cv::Mat& depth_not_rescaled_image,
                               const Segmentation& instance_segmentation,
                               const cv::Mat& depth_map, const cv::Mat& edge_map,
-                              const cv::Mat& normal_map, cv::Mat* labeled_map,
+                              const cv::Mat& normal_map, const double stamp,
+                              cv::Mat* labeled_map,
                               std::vector<cv::Mat>* segment_masks,
                               std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
@@ -977,6 +979,109 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     }
   }
 
+  bool write = true;
+  const std::string classes[] = {"BG",
+                                 "person",
+                                 "bicycle",
+                                 "car",
+                                 "motorcycle",
+                                 "airplane",
+                                 "bus",
+                                 "train",
+                                 "truck",
+                                 "boat",
+                                 "traffic light",
+                                 "fire hydrant",
+                                 "stop sign",
+                                 "parking meter",
+                                 "bench",
+                                 "bird",
+                                 "cat",
+                                 "dog",
+                                 "horse",
+                                 "sheep",
+                                 "cow",
+                                 "elephant",
+                                 "bear",
+                                 "zebra",
+                                 "giraffe",
+                                 "backpack",
+                                 "umbrella",
+                                 "handbag",
+                                 "tie",
+                                 "suitcase",
+                                 "frisbee",
+                                 "skis",
+                                 "snowboard",
+                                 "sports ball",
+                                 "kite",
+                                 "baseball bat",
+                                 "baseball glove",
+                                 "skateboard",
+                                 "surfboard",
+                                 "tennis racket",
+                                 "bottle",
+                                 "wine glass",
+                                 "cup",
+                                 "fork",
+                                 "knife",
+                                 "spoon",
+                                 "bowl",
+                                 "banana",
+                                 "apple",
+                                 "sandwich",
+                                 "orange",
+                                 "broccoli",
+                                 "carrot",
+                                 "hot dog",
+                                 "pizza",
+                                 "donut",
+                                 "cake",
+                                 "chair",
+                                 "couch",
+                                 "potted plant",
+                                 "bed",
+                                 "dining table",
+                                 "toilet",
+                                 "tv",
+                                 "laptop",
+                                 "mouse",
+                                 "remote",
+                                 "keyboard",
+                                 "cell phone",
+                                 "microwave",
+                                 "oven",
+                                 "toaster",
+                                 "sink",
+                                 "refrigerator",
+                                 "book",
+                                 "clock",
+                                 "vase",
+                                 "scissors",
+                                 "teddy bear",
+                                 "hair drier",
+                                 "toothbrush"};
+  if (write) {
+    // Save current frame DS segments and Mask RCNN + RGB and D
+    cv::imwrite("ds_output/depth_" + std::to_string(stamp) + ".png",
+                depth_not_rescaled_image);
+    // cv::imwrite(
+    //     "ds_maskrcnn_segments/" + std::to_string(stamp) + "_rgb" + ".png",
+    //     rgb_image);
+    // for (size_t i = 0u; i < segments->size(); ++i) {
+    //   cv::imwrite("ds_maskrcnn_segments/" + std::to_string(stamp) +
+    //   "_ds_mask" +
+    //                   std::to_string(i) + ".png",
+    //               (*segment_masks)[i]);
+    // }
+    // for (size_t j = 0u; j < instance_segmentation.masks.size(); ++j) {
+    //   cv::imwrite("ds_maskrcnn_segments/" + std::to_string(stamp) +
+    //                   "_maskrcnn_mask" + std::to_string(j) + "_" +
+    //                   classes[instance_segmentation.labels[j]] + ".png",
+    //               instance_segmentation.masks[j]);
+    // }
+  }
+
   // Instance stuff.
   int segment_count;
   int mask_count;
@@ -997,8 +1102,9 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
 
         float mask_overlap = (float)overlap_count / (float)mask_count;
         float segment_overlap = (float)overlap_count / (float)segment_count;
-        if (overlap_count > max_mask_overlap && segment_overlap > 0.8f &&
-            mask_overlap > 0.2f) {
+        if (overlap_count > max_mask_overlap && segment_overlap > 0.8f
+            // && mask_overlap > 0.2f
+        ) {
           mask_index = j;
           max_mask_overlap = overlap_count;
           // LOG(ERROR) << "Mask overlap " << mask_overlap;
@@ -1034,6 +1140,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     static const std::string kWindowName = "LabelMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     imshow(kWindowName, output);
+    cv::imwrite("ds_output/segments" + std::to_string(stamp) + ".png", output);
     cv::waitKey(100);
   }
   *labeled_map = output;
@@ -1117,9 +1224,9 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   cv::Mat remove_no_values = cv::Mat::zeros(edge_map.size(), edge_map.type());
   edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
   edge_map = remove_no_values;
-  depth_segmenter.labelMap(rgb_image, rescaled_depth, instance_segmentation,
-                           depth_map, edge_map, *normal_map, label_map,
-                           segment_masks, segments);
+  depth_segmenter.labelMap(rgb_image, rescaled_depth, rescaled_depth,
+                           instance_segmentation, depth_map, edge_map,
+                           *normal_map, 0, label_map, segment_masks, segments);
 }
 
 }  // namespace depth_segmentation
