@@ -1,0 +1,56 @@
+# Some classes end with Error e.g. MarginalizationError, where the scoping :: helps to disambiguate.
+ok /[Ee]rror::/
+# Failures to init Gui
+ok /libdc1394/
+# make clean errors are also ok
+ok /(ignored)/
+# Errors in STXXL are ok
+ok /STXXL-ERRMSG/
+
+# ignore doxygen warnings
+ok /is not documented/
+
+# ICP error
+ok /min error: /
+ok /max error: /
+
+# Layer evaluation error
+ok /mean squared error: /
+
+# Build output:
+error /error: /
+
+# glog check failures in tests:
+error /Check failure stack trace:/
+
+# CMake errors:
+error /^CMake\u0020Error/
+
+# CMake warnings:
+warning /^CMake\u0020Warning/
+
+# Linker dynamic library not found
+error /error while loading shared libraries:/
+
+# Tests:
+#start /FAILURES:/
+ok /test/
+ok /\[FAILURE\]/ # We parse test errors separately.
+
+# Test segmentation fault:
+error /Segmentation fault/
+
+# Build output:
+error /[Ee]rror: [^\s]/
+error /ld: cannot find/
+error /Error [0-9]/
+#error /\[FAIL\]/
+
+warning /[Ww]arning:/
+
+info /[Nn]ote:/
+
+# each line containing 'c++' represents the start of a section for grouping errors and warnings found after the line.
+start /ccache/
+
+start /gcc/
