@@ -121,7 +121,7 @@ class DepthSegmentationNode {
 
   void publish_segments(
       const std::vector<depth_segmentation::Segment>& segments,
-      const ros::Time& timestamp) {
+      const std_msgs::Header& header ) {
     CHECK_GT(segments.size(), 0u);
     pcl::PointCloud<PointType>::Ptr scene_pcl(new pcl::PointCloud<PointType>);
     for (depth_segmentation::Segment segment : segments) {
@@ -144,8 +144,8 @@ class DepthSegmentationNode {
       }
       sensor_msgs::PointCloud2 pcl2_msg;
       pcl::toROSMsg(*segment_pcl, pcl2_msg);
-      pcl2_msg.header.stamp = timestamp;
-      pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
+      pcl2_msg.header.stamp = header.stamp;
+      pcl2_msg.header.frame_id = header.frame_id;
       point_cloud2_segment_pub_.publish(pcl2_msg);
     }
     // Just for rviz also publish the whole scene, as otherwise only ~10
@@ -153,8 +153,8 @@ class DepthSegmentationNode {
     // https://github.com/ros-visualization/rviz/issues/689
     sensor_msgs::PointCloud2 pcl2_msg;
     pcl::toROSMsg(*scene_pcl, pcl2_msg);
-    pcl2_msg.header.stamp = timestamp;
-    pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
+    pcl2_msg.header.stamp = header.stamp;
+    pcl2_msg.header.frame_id = header.frame_id;
     point_cloud2_scene_pub_.publish(pcl2_msg);
   }
 
@@ -278,7 +278,7 @@ class DepthSegmentationNode {
                                   depth_map, edge_map, normal_map, &label_map,
                                   &segment_masks, &segments);
         if (segments.size() > 0) {
-          publish_segments(segments, depth_msg->header.stamp);
+          publish_segments(segments, depth_msg->header);
         }
 
         // Update the member images to the new images.
