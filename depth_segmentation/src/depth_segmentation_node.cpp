@@ -167,14 +167,26 @@ class DepthSegmentationNode {
       if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
         cv_depth_image = cv_bridge::toCvCopy(
             depth_msg, sensor_msgs::image_encodings::TYPE_16UC1);
+        rescaled_depth = cv::Mat(cv_depth_image->image.size(), CV_32FC1);
+        cv::rgbd::rescaleDepth(cv_depth_image->image, CV_32FC1, rescaled_depth);
       } else if (depth_msg->encoding ==
                  sensor_msgs::image_encodings::TYPE_32FC1) {
         cv_depth_image = cv_bridge::toCvCopy(
             depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+        rescaled_depth = cv_depth_image->image;
       }
 
-      rescaled_depth = cv::Mat(cv_depth_image->image.size(), CV_32FC1);
-      cv::rgbd::rescaleDepth(cv_depth_image->image, CV_32FC1, rescaled_depth);
+      constexpr double kZeroValue = 0.0;
+      cv::Mat nan_mask = rescaled_depth != rescaled_depth;
+      rescaled_depth.setTo(kZeroValue, nan_mask);
+
+      if (params_.dilate_depth_image) {
+        cv::Mat element = cv::getStructuringElement(
+            cv::MORPH_RECT, cv::Size(2u * params_.dilation_size + 1u,
+                                     2u * params_.dilation_size + 1u));
+        cv::morphologyEx(rescaled_depth, rescaled_depth, cv::MORPH_DILATE,
+                         element);
+      }
 
       cv_bridge::CvImagePtr cv_rgb_image;
       cv_rgb_image =
@@ -342,6 +354,9 @@ class DepthSegmentationNode {
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
+  constexpr int kSevThresh = 0;
+  FLAGS_stderrthreshold = kSevThresh;
+
   LOG(INFO) << "Starting depth segmentation ... ";
   ros::init(argc, argv, "depth_segmentation_node");
   DepthSegmentationNode depth_segmentation_node;
