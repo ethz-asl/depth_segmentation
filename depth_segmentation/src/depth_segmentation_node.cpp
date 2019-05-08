@@ -354,8 +354,6 @@ class DepthSegmentationNode {
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
-  constexpr int kSevThresh = 0;
-  FLAGS_stderrthreshold = kSevThresh;
 
   LOG(INFO) << "Starting depth segmentation ... ";
   ros::init(argc, argv, "depth_segmentation_node");
