@@ -15,6 +15,6 @@ const static std::string kDepthCameraInfoTopic = "/camera/depth/camera_info";
 const static std::string kTfWorldFrame = "world";
 const static std::string kTfDepthCameraFrame = "camera_depth_optical_frame";
 
-} // namespace depth_segmentation
+}  // namespace depth_segmentation
 
-#endif // DEPTH_SEGMENTATION_ROS_COMMON_H_
+#endif  // DEPTH_SEGMENTATION_ROS_COMMON_H_
