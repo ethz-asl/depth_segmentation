@@ -8,8 +8,10 @@
 namespace depth_segmentation {
 const static std::string kRgbImageTopic = "/camera/rgb/image_raw";
 const static std::string kRgbCameraInfoTopic = "/camera/rgb/camera_info";
-const static std::string kDepthImageTopic = "/camera/depth/image_raw";
-const static std::string kDepthCameraInfoTopic = "/camera/depth/camera_info";
+const static std::string kDepthImageTopic =
+    "/camera/depth_registered/image_raw";
+const static std::string kDepthCameraInfoTopic =
+    "/camera/depth_registered/camera_info";
 
 const static std::string kTfWorldFrame = "map";
 const static std::string kTfDepthCameraFrame = "camera0";
