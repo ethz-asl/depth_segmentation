@@ -31,25 +31,46 @@ class DepthSegmentationNode {
       : node_handle_("~"),
         image_transport_(node_handle_),
         camera_info_ready_(false),
-        depth_image_sub_(image_transport_, depth_segmentation::kDepthImageTopic,
-                         1),
-        rgb_image_sub_(image_transport_, depth_segmentation::kRgbImageTopic, 1),
-        depth_info_sub_(node_handle_, depth_segmentation::kDepthCameraInfoTopic,
-                        1),
-        rgb_info_sub_(node_handle_, depth_segmentation::kRgbCameraInfoTopic, 1),
-        image_sync_policy_(ImageSyncPolicy(10), depth_image_sub_,
-                           rgb_image_sub_),
-        camera_info_sync_policy_(CameraInfoSyncPolicy(10), depth_info_sub_,
-                                 rgb_info_sub_),
         depth_camera_(),
         rgb_camera_(),
         params_(),
         camera_tracker_(depth_camera_, rgb_camera_),
         depth_segmenter_(depth_camera_, params_) {
-    image_sync_policy_.registerCallback(
+    node_handle_.param<std::string>("depth_image_sub_topic", depth_image_topic_,
+                                    depth_segmentation::kDepthImageTopic);
+    node_handle_.param<std::string>("rgb_image_sub_topic", rgb_image_topic_,
+                                    depth_segmentation::kRgbImageTopic);
+    node_handle_.param<std::string>("depth_camera_info_sub_topic",
+                                    depth_camera_info_topic_,
+                                    depth_segmentation::kDepthCameraInfoTopic);
+    node_handle_.param<std::string>("rgb_camera_info_sub_topic",
+                                    rgb_camera_info_topic_,
+                                    depth_segmentation::kRgbCameraInfoTopic);
+    node_handle_.param<std::string>("world_frame", world_frame_,
+                                    depth_segmentation::kTfWorldFrame);
+    node_handle_.param<std::string>("camera_frame", camera_frame_,
+                                    depth_segmentation::kTfDepthCameraFrame);
+
+    depth_image_sub_ = new image_transport::SubscriberFilter(
+        image_transport_, depth_image_topic_, 1);
+    rgb_image_sub_ = new image_transport::SubscriberFilter(image_transport_,
+                                                           rgb_image_topic_, 1);
+    depth_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
+        node_handle_, depth_camera_info_topic_, 1);
+    rgb_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
+        node_handle_, rgb_camera_info_topic_, 1);
+
+    image_sync_policy_ = new message_filters::Synchronizer<ImageSyncPolicy>(
+        ImageSyncPolicy(10), *depth_image_sub_, *rgb_image_sub_);
+    camera_info_sync_policy_ =
+        new message_filters::Synchronizer<CameraInfoSyncPolicy>(
+            CameraInfoSyncPolicy(10), *depth_info_sub_, *rgb_info_sub_);
+
+    image_sync_policy_->registerCallback(
         boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
-    camera_info_sync_policy_.registerCallback(
+    camera_info_sync_policy_->registerCallback(
         boost::bind(&DepthSegmentationNode::cameraInfoCallback, this, _1, _2));
+
     point_cloud2_segment_pub_ =
         node_handle_.advertise<sensor_msgs::PointCloud2>("object_segment",
                                                          1000);
@@ -80,17 +101,24 @@ class DepthSegmentationNode {
   depth_segmentation::DepthSegmenter depth_segmenter_;
 
  private:
-  message_filters::Subscriber<sensor_msgs::CameraInfo> depth_info_sub_;
-  message_filters::Subscriber<sensor_msgs::CameraInfo> rgb_info_sub_;
+  std::string rgb_image_topic_;
+  std::string rgb_camera_info_topic_;
+  std::string depth_image_topic_;
+  std::string depth_camera_info_topic_;
+  std::string world_frame_;
+  std::string camera_frame_;
 
-  image_transport::SubscriberFilter depth_image_sub_;
-  image_transport::SubscriberFilter rgb_image_sub_;
+  image_transport::SubscriberFilter* depth_image_sub_;
+  image_transport::SubscriberFilter* rgb_image_sub_;
+
+  message_filters::Subscriber<sensor_msgs::CameraInfo>* depth_info_sub_;
+  message_filters::Subscriber<sensor_msgs::CameraInfo>* rgb_info_sub_;
 
   ros::Publisher point_cloud2_segment_pub_;
   ros::Publisher point_cloud2_scene_pub_;
 
-  message_filters::Synchronizer<ImageSyncPolicy> image_sync_policy_;
-  message_filters::Synchronizer<CameraInfoSyncPolicy> camera_info_sync_policy_;
+  message_filters::Synchronizer<ImageSyncPolicy>* image_sync_policy_;
+  message_filters::Synchronizer<CameraInfoSyncPolicy>* camera_info_sync_policy_;
 
   void publish_tf(const cv::Mat cv_transform, const ros::Time& timestamp) {
     // Rotate such that the world frame initially aligns with the camera_link
@@ -115,8 +143,7 @@ class DepthSegmentationNode {
     transform.setBasis(rotation_tf);
 
     transform_broadcaster_.sendTransform(tf::StampedTransform(
-        transform, timestamp, depth_segmentation::kTfDepthCameraFrame,
-        depth_segmentation::kTfWorldFrame));
+        transform, timestamp, camera_frame_, world_frame_));
   }
 
   void publish_segments(
@@ -145,7 +172,7 @@ class DepthSegmentationNode {
       sensor_msgs::PointCloud2 pcl2_msg;
       pcl::toROSMsg(*segment_pcl, pcl2_msg);
       pcl2_msg.header.stamp = timestamp;
-      pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
+      pcl2_msg.header.frame_id = camera_frame_;
       point_cloud2_segment_pub_.publish(pcl2_msg);
     }
     // Just for rviz also publish the whole scene, as otherwise only ~10
@@ -154,7 +181,7 @@ class DepthSegmentationNode {
     sensor_msgs::PointCloud2 pcl2_msg;
     pcl::toROSMsg(*scene_pcl, pcl2_msg);
     pcl2_msg.header.stamp = timestamp;
-    pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
+    pcl2_msg.header.frame_id = camera_frame_;
     point_cloud2_scene_pub_.publish(pcl2_msg);
   }
 
