@@ -1,4 +1,6 @@
 depth_segmentation_node: {
+  dilate_depth_image: true,
+  dilation_size: 1,
   depth_discontinuity_display: true,
   depth_discontinuity_kernel_size: 5,
   depth_discontinuity_ratio: 0.06,
