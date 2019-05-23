@@ -733,6 +733,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                               cv::Mat* labeled_map,
                               std::vector<cv::Mat>* segment_masks,
                               std::vector<Segment>* segments) {
+  voxblox::timing::Timer compute_label_map("compute_label_map");
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
   // CHECK(!label_image.empty());
@@ -968,6 +969,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       break;
     }
   }
+  compute_label_map.Stop();
 
   // Remove small segments from segments vector.
   for (size_t i = 0u; i < segments->size();) {
@@ -1082,6 +1084,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     // }
   }
 
+  voxblox::timing::Timer segmentation_fusion("segmentation_fusion");
   // Instance stuff.
   int segment_count;
   int mask_count;
@@ -1131,6 +1134,8 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     }
     // cv::waitKey(0);
   }
+
+  segmentation_fusion.Stop();
 
   if (params_.label.use_inpaint) {
     inpaintImage(depth_image, edge_map, output, &output);

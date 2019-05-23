@@ -1,6 +1,7 @@
 #ifndef DEPTH_SEGMENTATION_COMMON_H_
 #define DEPTH_SEGMENTATION_COMMON_H_
 
+#include <omp.h>
 #include <string>
 #include <vector>
 

@@ -5,6 +5,8 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/rgbd.hpp>
 
+#include <voxblox/utils/timing.h>
+
 #include "depth_segmentation/DepthSegmenterConfig.h"
 #include "depth_segmentation/common.h"
 

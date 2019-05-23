@@ -30,4 +30,5 @@
   <depend>pcl_ros</depend>
   <depend>roscpp</depend>
   <depend>tf</depend>
+  <depend>voxblox</depend>
 </package>

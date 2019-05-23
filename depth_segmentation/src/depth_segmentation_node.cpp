@@ -151,7 +151,7 @@ class DepthSegmentationNode {
 
   void publish_segments(
       const std::vector<depth_segmentation::Segment>& segments,
-      const ros::Time& timestamp) {
+      const std_msgs::Header& header) {
     CHECK_GT(segments.size(), 0u);
     pcl::PointCloud<PointType>::Ptr scene_pcl(new pcl::PointCloud<PointType>);
     for (depth_segmentation::Segment segment : segments) {
@@ -187,8 +187,8 @@ class DepthSegmentationNode {
       }
       sensor_msgs::PointCloud2 pcl2_msg;
       pcl::toROSMsg(*segment_pcl, pcl2_msg);
-      pcl2_msg.header.stamp = timestamp;
-      pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
+      pcl2_msg.header.stamp = header.stamp;
+      pcl2_msg.header.frame_id = header.frame_id;
       point_cloud2_segment_pub_.publish(pcl2_msg);
     }
     // Just for rviz also publish the whole scene, as otherwise only ~10
@@ -196,8 +196,8 @@ class DepthSegmentationNode {
     // https://github.com/ros-visualization/rviz/issues/689
     sensor_msgs::PointCloud2 pcl2_msg;
     pcl::toROSMsg(*scene_pcl, pcl2_msg);
-    pcl2_msg.header.stamp = timestamp;
-    pcl2_msg.header.frame_id = depth_segmentation::kTfDepthCameraFrame;
+    pcl2_msg.header.stamp = header.stamp;
+    pcl2_msg.header.frame_id = header.frame_id;
     point_cloud2_scene_pub_.publish(pcl2_msg);
   }
 
@@ -222,6 +222,7 @@ class DepthSegmentationNode {
                      const sensor_msgs::Image::ConstPtr& rgb_msg,
                      const mask_rcnn_ros::Result::ConstPtr& segmentation_msg) {
     if (camera_info_ready_) {
+      voxblox::timing::Timer preprocessing("rgbd_preprocessing");
       cv_bridge::CvImagePtr cv_depth_image;
       cv::Mat rescaled_depth;
 
@@ -236,6 +237,7 @@ class DepthSegmentationNode {
 
       rescaled_depth = cv::Mat(cv_depth_image->image.size(), CV_32FC1);
       cv::rgbd::rescaleDepth(cv_depth_image->image, CV_32FC1, rescaled_depth);
+      // rescaled_depth = rescaled_depth * 1.05f;
 
       cv_bridge::CvImagePtr cv_rgb_image;
       cv_rgb_image =
@@ -252,6 +254,9 @@ class DepthSegmentationNode {
 
       cv::Mat mask(bw_image.size(), CV_8UC1,
                    cv::Scalar(depth_segmentation::CameraTracker::kImageRange));
+
+      preprocessing.Stop();
+
       if (!camera_tracker_.getRgbImage().empty() &&
           !camera_tracker_.getDepthImage().empty()) {
 #ifdef WRITE_IMAGES
@@ -285,11 +290,15 @@ class DepthSegmentationNode {
             LOG(ERROR) << "Failed to compute Transform.";
           }
         }
+
+        voxblox::timing::Timer compute_depth_map("compute_depth_map");
         cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
                           CV_32FC3);
         depth_segmenter_.computeDepthMap(rescaled_depth, &depth_map);
+        compute_depth_map.Stop();
 
         // Compute normal map.
+        voxblox::timing::Timer compute_normal_map("compute_normal_map");
         cv::Mat normal_map(depth_map.size(), CV_32FC3, 0.0f);
         if (params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
@@ -304,6 +313,9 @@ class DepthSegmentationNode {
                        kLinemod) {
           depth_segmenter_.computeNormalMap(cv_depth_image->image, &normal_map);
         }
+        compute_normal_map.Stop();
+
+        voxblox::timing::Timer compute_edge_map("compute_edge_map");
 
         // Compute depth discontinuity map.
         cv::Mat discontinuity_map = cv::Mat::zeros(
@@ -334,6 +346,8 @@ class DepthSegmentationNode {
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                              discontinuity_map, &edge_map);
 
+        compute_edge_map.Stop();
+
         cv::Mat label_map(edge_map.size(), CV_32FC1);
         cv::Mat remove_no_values =
             cv::Mat::zeros(edge_map.size(), edge_map.type());
@@ -346,8 +360,9 @@ class DepthSegmentationNode {
                                   depth_map, edge_map, normal_map,
                                   rgb_msg->header.stamp.toSec(), &label_map,
                                   &segment_masks, &segments);
+
         if (segments.size() > 0) {
-          publish_segments(segments, depth_msg->header.stamp);
+          publish_segments(segments, depth_msg->header);
         }
 
         // Update the member images to the new images.
@@ -356,12 +371,14 @@ class DepthSegmentationNode {
         depth_camera_.setImage(rescaled_depth);
         depth_camera_.setMask(mask);
         rgb_camera_.setImage(bw_image);
-
       } else {
         depth_camera_.setImage(rescaled_depth);
         depth_camera_.setMask(mask);
         rgb_camera_.setImage(bw_image);
       }
+
+      ROS_INFO_STREAM("Timings: " << std::endl
+                                  << voxblox::timing::Timing::Print());
     }
   }
 

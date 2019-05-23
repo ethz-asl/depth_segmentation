@@ -5,20 +5,12 @@ add_definitions(-std=c++14)
 
 find_package(catkin_simple REQUIRED)
 
-# set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
 if(APPLE)
-  catkin_simple(ALL_DEPS_REQUIRED)
-  # find_package(LLVM HINTS /usr/local/Cellar/llvm)
-  # if (LLVM_FOUND)
-  #   set(CMAKE_C_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang)
-  #   set(CMAKE_CXX_COMPILER ${LLVM_TOOLS_BINARY_DIR}/clang++)
-  # else()
-  #   set(CMAKE_C_COMPILER clang-omp)
-  #   set(CMAKE_CXX_COMPILER clang-omp++)
-  # endif()
-  # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
-  # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+  catkin_simple()
+  set(CMAKE_C_COMPILER clang-omp)
+  set(CMAKE_CXX_COMPILER clang-omp++)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 else()
   catkin_simple(ALL_DEPS_REQUIRED)
   # OpenMP
@@ -34,7 +26,7 @@ else()
     message("Unrecognized C++ compiler: ${CMAKE_CXX_COMPILER} ID: ${CMAKE_CXX_COMPILER_ID}. Compiling without openMP support.")
   endif()
 endif()
-# message(FATAL_ERROR ${CMAKE_INSTALL_RPATH})
+
 
 cs_add_library(${PROJECT_NAME}
   src/depth_segmentation.cpp
