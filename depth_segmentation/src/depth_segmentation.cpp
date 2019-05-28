@@ -979,37 +979,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     }
   }
 
-  bool write = true;
-
-  if (write) {
-    // Save current frame DS segments and Mask RCNN + RGB and D
-    cv::imwrite("ds_output/depth_" + std::to_string(stamp) + ".png",
-                depth_not_rescaled_image);
-    cv::imwrite(
-        "ds_maskrcnn_segments/" + std::to_string(stamp) + "_rgb" + ".png",
-        rgb_image);
-    for (size_t i = 0u; i < segments->size(); ++i) {
-      cv::imwrite("ds_maskrcnn_segments/" + std::to_string(stamp) + "_ds_mask" +
-                      std::to_string(i) + ".png",
-                  (*segment_masks)[i]);
-    }
-    for (size_t j = 0u; j < instance_segmentation.masks.size(); ++j) {
-      LOG(ERROR) << "Mask size " << instance_segmentation.masks[j].size();
-      cv::Mat dst;
-      rgb_image.copyTo(dst, instance_segmentation.masks[j]);
-      // addWeighted(instance_segmentation.masks[j], 0.5, rgb_image, 0.5, 0.0,
-      //             dst);
-      cv::imwrite("ds_maskrcnn_segments/" + std::to_string(stamp) +
-                      "_maskrcnn_overlay" + std::to_string(j) + "_" +
-                      classes[instance_segmentation.labels[j]] + ".png",
-                  dst);
-      cv::imwrite("ds_maskrcnn_segments/" + std::to_string(stamp) +
-                      "_maskrcnn_mask" + std::to_string(j) + "_" +
-                      classes[instance_segmentation.labels[j]] + ".png",
-                  instance_segmentation.masks[j]);
-    }
-  }
-
   // Instance stuff.
   int segment_count;
   int mask_count;
@@ -1041,14 +1010,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       }
     }
     if (max_mask_overlap > 0) {
-      // const std::string classes[] = {"BG",      "Unknown", "Bed",   "Books",
-      //                                "Ceiling", "Chair",   "Floor",
-      //                                "Furniture", "Objects", "Picture",
-      //                                "Sofa",  "Table", "TV",      "Wall",
-      //                                "Window"};
-      // LOG(ERROR) << "Segment has class: "
-      //            << classes[instance_segmentation.labels[mask_index]];
-
       (*segments)[i].semantic_label.insert(
           instance_segmentation.labels[mask_index]);
       (*segments)[i].instance_label.insert(mask_index + 1u);
@@ -1057,7 +1018,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     } else {
       // LOG(ERROR) << "Segment has no class.";
     }
-    // cv::waitKey(0);
   }
 
   if (params_.label.use_inpaint) {
@@ -1068,7 +1028,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     static const std::string kWindowName = "LabelMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     imshow(kWindowName, output);
-    cv::imwrite("ds_output/segments" + std::to_string(stamp) + ".png", output);
     cv::waitKey(100);
   }
   *labeled_map = output;
