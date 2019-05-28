@@ -16,8 +16,8 @@ struct Segment {
   std::vector<cv::Vec3f> normals;
   std::vector<cv::Vec3f> original_colors;
   std::set<size_t> label;
-  std::set<size_t> semantic_label;
   std::set<size_t> instance_label;
+  std::set<size_t> semantic_label;
 };
 
 const static std::string kDebugWindowName = "DebugImages";

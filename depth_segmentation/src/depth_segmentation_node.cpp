@@ -222,7 +222,6 @@ class DepthSegmentationNode {
                      const sensor_msgs::Image::ConstPtr& rgb_msg,
                      const mask_rcnn_ros::Result::ConstPtr& segmentation_msg) {
     if (camera_info_ready_) {
-      voxblox::timing::Timer preprocessing("rgbd_preprocessing");
       cv_bridge::CvImagePtr cv_depth_image;
       cv::Mat rescaled_depth;
 
@@ -254,8 +253,6 @@ class DepthSegmentationNode {
 
       cv::Mat mask(bw_image.size(), CV_8UC1,
                    cv::Scalar(depth_segmentation::CameraTracker::kImageRange));
-
-      preprocessing.Stop();
 
       if (!camera_tracker_.getRgbImage().empty() &&
           !camera_tracker_.getDepthImage().empty()) {
@@ -291,14 +288,11 @@ class DepthSegmentationNode {
           }
         }
 
-        voxblox::timing::Timer compute_depth_map("compute_depth_map");
         cv::Mat depth_map(depth_camera_.getWidth(), depth_camera_.getHeight(),
                           CV_32FC3);
         depth_segmenter_.computeDepthMap(rescaled_depth, &depth_map);
-        compute_depth_map.Stop();
 
         // Compute normal map.
-        voxblox::timing::Timer compute_normal_map("compute_normal_map");
         cv::Mat normal_map(depth_map.size(), CV_32FC3, 0.0f);
         if (params_.normals.method ==
                 depth_segmentation::SurfaceNormalEstimationMethod::kFals ||
@@ -313,9 +307,6 @@ class DepthSegmentationNode {
                        kLinemod) {
           depth_segmenter_.computeNormalMap(cv_depth_image->image, &normal_map);
         }
-        compute_normal_map.Stop();
-
-        voxblox::timing::Timer compute_edge_map("compute_edge_map");
 
         // Compute depth discontinuity map.
         cv::Mat discontinuity_map = cv::Mat::zeros(
@@ -346,8 +337,6 @@ class DepthSegmentationNode {
         depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                              discontinuity_map, &edge_map);
 
-        compute_edge_map.Stop();
-
         cv::Mat label_map(edge_map.size(), CV_32FC1);
         cv::Mat remove_no_values =
             cv::Mat::zeros(edge_map.size(), edge_map.type());
@@ -376,9 +365,6 @@ class DepthSegmentationNode {
         depth_camera_.setMask(mask);
         rgb_camera_.setImage(bw_image);
       }
-
-      ROS_INFO_STREAM("Timings: " << std::endl
-                                  << voxblox::timing::Timing::Print());
     }
   }
 
