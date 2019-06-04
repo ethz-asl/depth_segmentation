@@ -25,13 +25,11 @@
 #include "depth_segmentation/depth_segmentation.h"
 #include "depth_segmentation/ros_common.h"
 
-// typedef pcl::PointSurfel PointType;
-
 struct PointSurfelLabel {
   PCL_ADD_POINT4D;
   PCL_ADD_NORMAL4D;
   PCL_ADD_RGB;
-  uint8_t label;
+  uint8_t label;  // TODO(margaritaG) change field names.
   uint8_t instance;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -42,8 +40,6 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
     (float, x, x)(float, y, y)(float, z, z)(float, normal_x, normal_x)(
         float, normal_y, normal_y)(float, normal_z, normal_z)(float, rgb, rgb)(
         uint8_t, label, label)(uint8_t, instance, instance))
-
-typedef PointSurfelLabel PointType;
 
 class DepthSegmentationNode {
  public:
@@ -77,7 +73,8 @@ class DepthSegmentationNode {
     if (semantic_instance_segmentation) {
       instance_segmentation_sub_ =
           new message_filters::Subscriber<mask_rcnn_ros::Result>(
-              node_handle_, depth_segmentation::kSegmentationTopic, 10);
+              node_handle_,
+              depth_segmentation::kSemanticInstanceSegmentationTopic, 10);
 
       image_segmentation_sync_policy_ =
           new message_filters::Synchronizer<ImageSegmentationSyncPolicy>(
@@ -177,67 +174,120 @@ class DepthSegmentationNode {
         depth_segmentation::kTfWorldFrame));
   }
 
+  void fillPoint(const cv::Vec3f& point, const cv::Vec3f& normals,
+                 const cv::Vec3f& colors, pcl::PointSurfel* point_pcl) {
+    point_pcl->x = point[0];
+    point_pcl->y = point[1];
+    point_pcl->z = point[2];
+    point_pcl->normal_x = normals[0];
+    point_pcl->normal_y = normals[1];
+    point_pcl->normal_z = normals[2];
+    point_pcl->r = colors[0];
+    point_pcl->g = colors[1];
+    point_pcl->b = colors[2];
+  }
+
+  void fillPoint(const cv::Vec3f& point, const cv::Vec3f& normals,
+                 const cv::Vec3f& colors, const size_t& label,
+                 const size_t& instance_label, PointSurfelLabel* point_pcl) {
+    point_pcl->x = point[0];
+    point_pcl->y = point[1];
+    point_pcl->z = point[2];
+    point_pcl->normal_x = normals[0];
+    point_pcl->normal_y = normals[1];
+    point_pcl->normal_z = normals[2];
+    point_pcl->r = colors[0];
+    point_pcl->g = colors[1];
+    point_pcl->b = colors[2];
+
+    point_pcl->label = label;
+    point_pcl->instance = instance_label;
+  }
+
   void publish_segments(
       const std::vector<depth_segmentation::Segment>& segments,
       const std_msgs::Header& header) {
     CHECK_GT(segments.size(), 0u);
-    pcl::PointCloud<PointType>::Ptr scene_pcl(new pcl::PointCloud<PointType>);
-    for (depth_segmentation::Segment segment : segments) {
-      CHECK_GT(segment.points.size(), 0u);
-      pcl::PointCloud<PointType>::Ptr segment_pcl(
-          new pcl::PointCloud<PointType>);
-      for (std::size_t i = 0; i < segment.points.size(); ++i) {
-        PointType point_pcl;
-        point_pcl.x = segment.points[i][0];
-        point_pcl.y = segment.points[i][1];
-        point_pcl.z = segment.points[i][2];
-        point_pcl.normal_x = segment.normals[i][0];
-        point_pcl.normal_y = segment.normals[i][1];
-        point_pcl.normal_z = segment.normals[i][2];
-        point_pcl.r = segment.original_colors[i][0];
-        point_pcl.g = segment.original_colors[i][1];
-        point_pcl.b = segment.original_colors[i][2];
-        if (segment.semantic_label.size() > 0) {
-          point_pcl.label = *(segment.semantic_label.begin());
-        } else {
-          point_pcl.label = 0u;
-        }
-        if (segment.instance_label.size() > 0) {
-          point_pcl.instance = *(segment.instance_label.begin());
-        } else {
-          point_pcl.instance = 0u;
-        }
-
-        segment_pcl->push_back(point_pcl);
-        scene_pcl->push_back(point_pcl);
-      }
-      sensor_msgs::PointCloud2 pcl2_msg;
-      pcl::toROSMsg(*segment_pcl, pcl2_msg);
-      pcl2_msg.header.stamp = header.stamp;
-      pcl2_msg.header.frame_id = header.frame_id;
-      point_cloud2_segment_pub_.publish(pcl2_msg);
-    }
     // Just for rviz also publish the whole scene, as otherwise only ~10
     // segments are shown:
     // https://github.com/ros-visualization/rviz/issues/689
     sensor_msgs::PointCloud2 pcl2_msg;
-    pcl::toROSMsg(*scene_pcl, pcl2_msg);
+
+    if (depth_segmenter_.semantic_instance_segmentation_) {
+      pcl::PointCloud<PointSurfelLabel>::Ptr scene_pcl(
+          new pcl::PointCloud<PointSurfelLabel>);
+      for (depth_segmentation::Segment segment : segments) {
+        CHECK_GT(segment.points.size(), 0u);
+        pcl::PointCloud<PointSurfelLabel>::Ptr segment_pcl(
+            new pcl::PointCloud<PointSurfelLabel>);
+        for (std::size_t i = 0; i < segment.points.size(); ++i) {
+          PointSurfelLabel point_pcl;
+          size_t label = 0u;
+          size_t instance_label = 0u;
+          if (segment.instance_label.size() > 0) {
+            instance_label = *(segment.instance_label.begin());
+            label = *(segment.semantic_label.begin());
+          }
+          fillPoint(segment.points[i], segment.normals[i],
+                    segment.original_colors[i], label, instance_label,
+                    &point_pcl);
+
+          segment_pcl->push_back(point_pcl);
+          scene_pcl->push_back(point_pcl);
+        }
+        sensor_msgs::PointCloud2 pcl2_msg;
+        pcl::toROSMsg(*segment_pcl, pcl2_msg);
+        pcl2_msg.header.stamp = header.stamp;
+        pcl2_msg.header.frame_id = header.frame_id;
+        point_cloud2_segment_pub_.publish(pcl2_msg);
+      }
+      pcl::toROSMsg(*scene_pcl, pcl2_msg);
+    } else {
+      pcl::PointCloud<pcl::PointSurfel>::Ptr scene_pcl(
+          new pcl::PointCloud<pcl::PointSurfel>);
+      for (depth_segmentation::Segment segment : segments) {
+        CHECK_GT(segment.points.size(), 0u);
+        pcl::PointCloud<pcl::PointSurfel>::Ptr segment_pcl(
+            new pcl::PointCloud<pcl::PointSurfel>);
+        for (std::size_t i = 0; i < segment.points.size(); ++i) {
+          pcl::PointSurfel point_pcl;
+
+          fillPoint(segment.points[i], segment.normals[i],
+                    segment.original_colors[i], &point_pcl);
+
+          segment_pcl->push_back(point_pcl);
+          scene_pcl->push_back(point_pcl);
+        }
+        sensor_msgs::PointCloud2 pcl2_msg;
+        pcl::toROSMsg(*segment_pcl, pcl2_msg);
+        pcl2_msg.header.stamp = header.stamp;
+        pcl2_msg.header.frame_id = header.frame_id;
+        point_cloud2_segment_pub_.publish(pcl2_msg);
+      }
+      pcl::toROSMsg(*scene_pcl, pcl2_msg);
+    }
+
     pcl2_msg.header.stamp = header.stamp;
     pcl2_msg.header.frame_id = header.frame_id;
     point_cloud2_scene_pub_.publish(pcl2_msg);
   }
 
-  void segmentationFromROSMsg(
+  void semanticInstanceSegmentationFromRosMsg(
       const mask_rcnn_ros::Result::ConstPtr& segmentation_msg,
-      depth_segmentation::SemanticInstanceSegmentation* instance_segmentation) {
-    instance_segmentation->masks.reserve(segmentation_msg->masks.size());
-    instance_segmentation->labels.reserve(segmentation_msg->masks.size());
-    for (int i = 0; i < segmentation_msg->masks.size(); ++i) {
+      depth_segmentation::SemanticInstanceSegmentation*
+          semantic_instance_segmentation) {
+    semantic_instance_segmentation->masks.reserve(
+        segmentation_msg->masks.size());
+    semantic_instance_segmentation->labels.reserve(
+        segmentation_msg->masks.size());
+    for (int i = 0u; i < segmentation_msg->masks.size(); ++i) {
       cv_bridge::CvImagePtr cv_mask_image;
       cv_mask_image = cv_bridge::toCvCopy(segmentation_msg->masks[i],
                                           sensor_msgs::image_encodings::MONO8);
-      instance_segmentation->masks.push_back(cv_mask_image->image.clone());
-      instance_segmentation->labels.push_back(segmentation_msg->class_ids[i]);
+      semantic_instance_segmentation->masks.push_back(
+          cv_mask_image->image.clone());
+      semantic_instance_segmentation->labels.push_back(
+          segmentation_msg->class_ids[i]);
     }
   }
 
@@ -376,7 +426,6 @@ class DepthSegmentationNode {
         edge_map = remove_no_values;
         std::vector<depth_segmentation::Segment> segments;
         std::vector<cv::Mat> segment_masks;
-        CHECK_NOTNULL(cv_rgb_image);
         depth_segmenter_.labelMap(cv_rgb_image->image, rescaled_depth,
                                   depth_map, edge_map, normal_map, &label_map,
                                   &segment_masks, &segments);
@@ -404,7 +453,8 @@ class DepthSegmentationNode {
       const sensor_msgs::Image::ConstPtr& rgb_msg,
       const mask_rcnn_ros::Result::ConstPtr& segmentation_msg) {
     depth_segmentation::SemanticInstanceSegmentation instance_segmentation;
-    segmentationFromROSMsg(segmentation_msg, &instance_segmentation);
+    semanticInstanceSegmentationFromRosMsg(segmentation_msg,
+                                           &instance_segmentation);
 
     if (camera_info_ready_) {
       cv_bridge::CvImagePtr cv_rgb_image, cv_depth_image;

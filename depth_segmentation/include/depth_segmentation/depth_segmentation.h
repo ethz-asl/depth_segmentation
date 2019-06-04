@@ -166,7 +166,6 @@ class DepthSegmenter {
       const cv::Mat& depth_map, const cv::Mat& edge_map,
       const cv::Mat& normal_map, cv::Mat* labeled_map,
       std::vector<cv::Mat>* segment_masks, std::vector<Segment>* segments);
-
   void inpaintImage(const cv::Mat& depth_image, const cv::Mat& edge_map,
                     const cv::Mat& label_map, cv::Mat* inpainted);
   void findBlobs(const cv::Mat& binary,

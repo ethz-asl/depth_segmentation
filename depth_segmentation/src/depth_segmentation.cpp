@@ -730,6 +730,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                               const cv::Mat& normal_map, cv::Mat* labeled_map,
                               std::vector<cv::Mat>* segment_masks,
                               std::vector<Segment>* segments) {
+  // Dummy variable.
   SemanticInstanceSegmentation instance_segmentation;
   labelMap(rgb_image, depth_image, instance_segmentation, depth_map, edge_map,
            normal_map, labeled_map, segment_masks, segments);
