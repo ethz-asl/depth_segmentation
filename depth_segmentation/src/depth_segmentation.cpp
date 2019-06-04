@@ -172,6 +172,10 @@ void DepthSegmenter::initialize() {
 
 void DepthSegmenter::dynamicReconfigureCallback(
     depth_segmentation::DepthSegmenterConfig& config, uint32_t level) {
+  // General params.
+  params_.dilate_depth_image = config.dilate_depth_image;
+  params_.dilation_size = config.dilation_size;
+
   // Surface normal params.
   if (config.normals_window_size % 2u != 1u) {
     // Resetting the config value to its previous value.

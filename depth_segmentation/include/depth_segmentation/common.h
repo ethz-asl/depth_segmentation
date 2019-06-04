@@ -118,6 +118,8 @@ struct IsNotNan {
 };
 
 struct Params {
+  bool dilate_depth_image = false;
+  size_t dilation_size = 1u;
   FinalEdgeMapParams final_edge;
   LabelMapParams label;
   DepthDiscontinuityMapParams depth_discontinuity;

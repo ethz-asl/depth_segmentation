@@ -60,15 +60,29 @@ class DepthSegmentationNode {
     depth_segmenter_.semantic_instance_segmentation_ =
         semantic_instance_segmentation;
 
-    depth_image_sub_ = new image_transport::SubscriberFilter(
-        image_transport_, depth_segmentation::kDepthImageTopic, 10);
-    rgb_image_sub_ = new image_transport::SubscriberFilter(
-        image_transport_, depth_segmentation::kRgbImageTopic, 10);
+    node_handle_.param<std::string>("depth_image_sub_topic", depth_image_topic_,
+                                    depth_segmentation::kDepthImageTopic);
+    node_handle_.param<std::string>("rgb_image_sub_topic", rgb_image_topic_,
+                                    depth_segmentation::kRgbImageTopic);
+    node_handle_.param<std::string>("depth_camera_info_sub_topic",
+                                    depth_camera_info_topic_,
+                                    depth_segmentation::kDepthCameraInfoTopic);
+    node_handle_.param<std::string>("rgb_camera_info_sub_topic",
+                                    rgb_camera_info_topic_,
+                                    depth_segmentation::kRgbCameraInfoTopic);
+    node_handle_.param<std::string>("world_frame", world_frame_,
+                                    depth_segmentation::kTfWorldFrame);
+    node_handle_.param<std::string>("camera_frame", camera_frame_,
+                                    depth_segmentation::kTfDepthCameraFrame);
 
+    depth_image_sub_ = new image_transport::SubscriberFilter(
+        image_transport_, depth_image_topic_, 10);
+    rgb_image_sub_ = new image_transport::SubscriberFilter(
+        image_transport_, rgb_image_topic_, 10);
     depth_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
-        node_handle_, depth_segmentation::kDepthCameraInfoTopic, 10);
+        node_handle_, depth_camera_info_topic_, 10);
     rgb_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
-        node_handle_, depth_segmentation::kRgbCameraInfoTopic, 10);
+        node_handle_, rgb_camera_info_topic_, 10);
 
     if (semantic_instance_segmentation) {
       instance_segmentation_sub_ =
@@ -98,6 +112,7 @@ class DepthSegmentationNode {
 
     camera_info_sync_policy_->registerCallback(
         boost::bind(&DepthSegmentationNode::cameraInfoCallback, this, _1, _2));
+
     point_cloud2_segment_pub_ =
         node_handle_.advertise<sensor_msgs::PointCloud2>("object_segment",
                                                          1000);
@@ -131,13 +146,21 @@ class DepthSegmentationNode {
   depth_segmentation::DepthSegmenter depth_segmenter_;
 
  private:
-  message_filters::Subscriber<sensor_msgs::CameraInfo>* depth_info_sub_;
-  message_filters::Subscriber<sensor_msgs::CameraInfo>* rgb_info_sub_;
+  std::string rgb_image_topic_;
+  std::string rgb_camera_info_topic_;
+  std::string depth_image_topic_;
+  std::string depth_camera_info_topic_;
+  std::string world_frame_;
+  std::string camera_frame_;
 
   image_transport::SubscriberFilter* depth_image_sub_;
   image_transport::SubscriberFilter* rgb_image_sub_;
+
   message_filters::Subscriber<mask_rcnn_ros::Result>*
       instance_segmentation_sub_;
+
+  message_filters::Subscriber<sensor_msgs::CameraInfo>* depth_info_sub_;
+  message_filters::Subscriber<sensor_msgs::CameraInfo>* rgb_info_sub_;
 
   ros::Publisher point_cloud2_segment_pub_;
   ros::Publisher point_cloud2_scene_pub_;
@@ -170,8 +193,7 @@ class DepthSegmentationNode {
     transform.setBasis(rotation_tf);
 
     transform_broadcaster_.sendTransform(tf::StampedTransform(
-        transform, timestamp, depth_segmentation::kTfDepthCameraFrame,
-        depth_segmentation::kTfWorldFrame));
+        transform, timestamp, camera_frame_, world_frame_));
   }
 
   void fillPoint(const cv::Vec3f& point, const cv::Vec3f& normals,
@@ -547,6 +569,7 @@ class DepthSegmentationNode {
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
+
   LOG(INFO) << "Starting depth segmentation ... ";
   ros::init(argc, argv, "depth_segmentation_node");
   DepthSegmentationNode depth_segmentation_node;
