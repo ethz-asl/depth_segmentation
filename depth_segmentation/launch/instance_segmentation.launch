@@ -1,0 +1,21 @@
+<launch>
+  <arg name="rgb_topic" default="/camera/rgb/image_raw" />
+  <arg name="depth_registered_topic" default="/camera/depth/image_raw"/>
+  <arg name="depth_camera_info_topic" default="/camera/depth/camera_info" />
+  <arg name="rgb_camera_info_topic" default="/camera/rgb/camera_info" />
+  <arg name="segmentation_topic" default="/mask_rcnn/result" />
+
+  <node name="mask_rcnn" pkg="mask_rcnn_ros" type="mask_rcnn_node.py" output="screen">
+      <remap from="~input" to="$(arg rgb_topic)" />
+      <param name="~visualization" value="true" />
+  </node>
+
+  <node name="depth_segmentation_node" pkg="depth_segmentation" type="depth_segmentation_node" output="screen">
+    <remap from="/camera/depth_registered/image_raw" to="$(arg depth_registered_topic)" />
+    <remap from="/camera/rgb/image_raw" to="$(arg rgb_topic)" />
+    <remap from="/camera/depth/camera_info" to="$(arg depth_camera_info_topic)" />
+    <remap from="/camera/rgb/camera_info" to="$(arg rgb_camera_info_topic)" />
+    <remap from="/rgbd_segmentation_node/segmentation" to="$(arg segmentation_topic)" />
+    <param name="semantic_instance_segmentation" value="true"/>
+  </node>
+</launch>

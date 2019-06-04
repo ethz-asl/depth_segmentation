@@ -726,16 +726,23 @@ void DepthSegmenter::generateRandomColorsAndLabels(
 
 void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                               const cv::Mat& depth_image,
-                              const cv::Mat& depth_not_rescaled_image,
-                              const Segmentation& instance_segmentation,
                               const cv::Mat& depth_map, const cv::Mat& edge_map,
-                              const cv::Mat& normal_map, const double stamp,
-                              cv::Mat* labeled_map,
+                              const cv::Mat& normal_map, cv::Mat* labeled_map,
                               std::vector<cv::Mat>* segment_masks,
                               std::vector<Segment>* segments) {
+  SemanticInstanceSegmentation instance_segmentation;
+  labelMap(rgb_image, depth_image, instance_segmentation, depth_map, edge_map,
+           normal_map, labeled_map, segment_masks, segments);
+}
+
+void DepthSegmenter::labelMap(
+    const cv::Mat& rgb_image, const cv::Mat& depth_image,
+    const SemanticInstanceSegmentation& instance_segmentation,
+    const cv::Mat& depth_map, const cv::Mat& edge_map,
+    const cv::Mat& normal_map, cv::Mat* labeled_map,
+    std::vector<cv::Mat>* segment_masks, std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
-  // CHECK(!label_image.empty());
   CHECK_EQ(depth_image.type(), CV_32FC1);
   CHECK(!edge_map.empty());
   CHECK_EQ(edge_map.type(), CV_32FC1);
@@ -743,7 +750,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   CHECK_EQ(normal_map.type(), CV_32FC3);
   CHECK_EQ(depth_image.size(), edge_map.size());
   CHECK_EQ(depth_image.size(), depth_map.size());
-  // CHECK_EQ(depth_image.size(), label_image.size());
   CHECK_NOTNULL(labeled_map);
   CHECK_NOTNULL(segment_masks);
   CHECK_NOTNULL(segments)->clear();
@@ -802,9 +808,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                      hierarchy);
         drawContours(output_labels, contours, i, cv::Scalar(labels[i]),
                      CV_FILLED, 8, hierarchy);
-
-        // drawContours(output_labels, contours, i, cv::Scalar(-1), 1, 8,
-        //              hierarchy);
         drawContours(edge_map_8u, contours, i, cv::Scalar(0u), 1, 8, hierarchy);
       }
 
@@ -870,11 +873,9 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                   if (label_tmp < 0) {
                     continue;
                   }
-                  // CHECK_GE(label_tmp, 0);
                   min_dist = dist;
                   label = label_tmp;
                   output_labels.at<int32_t>(y, x) = label;
-                  // LOG(ERROR) << label_tmp;
                 }
               }
             }
@@ -979,44 +980,43 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
     }
   }
 
-  // Instance stuff.
-  int segment_count;
-  int mask_count;
-  for (size_t i = 0u; i < segments->size(); ++i) {
-    size_t mask_index = 0u;
-    int max_mask_overlap = 0;
-    segment_count = cv::countNonZero((*segment_masks)[i]);
+  if (semantic_instance_segmentation_) {
+    int segment_size;
+    int mask_size;
 
-    for (size_t j = 0u; j < instance_segmentation.masks.size(); ++j) {
-      // Find the mask overlapping the most.
-      mask_count = cv::countNonZero(instance_segmentation.masks[j]);
-      if (mask_count > 0) {
-        cv::Mat masks_and;
+    for (size_t i = 0u; i < segments->size(); ++i) {
+      // For each DS segment identify the corresponding
+      // maximally overlapping mask, if any.
+      size_t maximally_overlapping_mask_index = 0u;
+      int max_overlap_size = 0;
+      segment_size = cv::countNonZero((*segment_masks)[i]);
+
+      for (size_t j = 0u; j < instance_segmentation.masks.size(); ++j) {
+        // Search through all masks to find the maximally overlapping one.
+        mask_size = cv::countNonZero(instance_segmentation.masks[j]);
+
+        cv::Mat mask_overlap;
         cv::bitwise_and((*segment_masks)[i], instance_segmentation.masks[j],
-                        masks_and);
+                        mask_overlap);
 
-        int overlap_count = cv::countNonZero(masks_and);
+        int overlap_size = cv::countNonZero(mask_overlap);
+        float normalized_overlap = (float)overlap_size / (float)segment_size;
 
-        float mask_overlap = (float)overlap_count / (float)mask_count;
-        float segment_overlap = (float)overlap_count / (float)segment_count;
-        if (overlap_count > max_mask_overlap && segment_overlap > 0.8f
-            // && mask_overlap > 0.2f
-        ) {
-          mask_index = j;
-          max_mask_overlap = overlap_count;
-          // LOG(ERROR) << "Mask overlap " << mask_overlap;
-          // LOG(ERROR) << "Segment overlap " << segment_overlap;
+        // TODO(margaritaG): make normalized overlap threshold
+        if (overlap_size > max_overlap_size && normalized_overlap > 0.8f) {
+          maximally_overlapping_mask_index = j;
+          max_overlap_size = overlap_size;
         }
       }
-    }
-    if (max_mask_overlap > 0) {
-      (*segments)[i].semantic_label.insert(
-          instance_segmentation.labels[mask_index]);
-      (*segments)[i].instance_label.insert(mask_index + 1u);
-      // if (instance_segmentation.labels[mask_index] == 0)
-      //   LOG(FATAL) << "LABEL 0! Background object detected.";
-    } else {
-      // LOG(ERROR) << "Segment has no class.";
+
+      if (max_overlap_size > 0) {
+        // Found a maximally overlapping mask, assign
+        // the corresponding semantic and instance labels.
+        (*segments)[i].semantic_label.insert(
+            instance_segmentation.labels[maximally_overlapping_mask_index]);
+        (*segments)[i].instance_label.insert(maximally_overlapping_mask_index +
+                                             1u);
+      }
     }
   }
 
@@ -1034,7 +1034,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
 }
 
 void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
-                        const Segmentation& instance_segmentation,
                         const cv::Mat& depth_intrinsics,
                         depth_segmentation::Params& params, cv::Mat* label_map,
                         cv::Mat* normal_map,
@@ -1111,9 +1110,8 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   cv::Mat remove_no_values = cv::Mat::zeros(edge_map.size(), edge_map.type());
   edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
   edge_map = remove_no_values;
-  depth_segmenter.labelMap(rgb_image, rescaled_depth, rescaled_depth,
-                           instance_segmentation, depth_map, edge_map,
-                           *normal_map, 0, label_map, segment_masks, segments);
+  depth_segmenter.labelMap(rgb_image, rescaled_depth, depth_map, edge_map,
+                           *normal_map, label_map, segment_masks, segments);
 }
 
 }  // namespace depth_segmentation
