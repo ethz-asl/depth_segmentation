@@ -10,10 +10,10 @@
   </node>
 
   <node name="depth_segmentation_node" pkg="depth_segmentation" type="depth_segmentation_node" output="screen">
-    <remap from="/camera/depth_registered/image_raw" to="$(arg depth_registered_topic)" />
-    <remap from="/camera/rgb/image_raw" to="$(arg rgb_topic)" />
-    <remap from="/camera/depth/camera_info" to="$(arg depth_camera_info_topic)" />
-    <remap from="/camera/rgb/camera_info" to="$(arg rgb_camera_info_topic)" />
+    <param name="depth_image_sub_topic" value="$(arg depth_registered_topic)" />
+    <param name="rgb_image_sub_topic" value="$(arg rgb_topic)" />
+    <param name="depth_camera_info_sub_topic" value="$(arg depth_camera_info_topic)" />
+    <param name="rgb_camera_info_sub_topic" value="$(arg rgb_camera_info_topic)" />
     <param name="semantic_instance_segmentation" value="true"/>
   </node>
 </launch>
