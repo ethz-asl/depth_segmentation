@@ -1,7 +1,10 @@
 #ifndef DEPTH_SEGMENTATION_COMMON_H_
 #define DEPTH_SEGMENTATION_COMMON_H_
 
+#ifdef _OPENMP
 #include <omp.h>
+#endif
+
 #include <string>
 #include <vector>
 
@@ -103,6 +106,11 @@ struct LabelMapParams {
   bool display = true;
 };
 
+struct SemanticInstanceSegmentationParams {
+  bool enable = false;
+  float overlap_threshold = 0.8f;
+};
+
 struct IsNan {
   template <class T>
   bool operator()(T const& p) const {
@@ -126,6 +134,8 @@ struct Params {
   MaxDistanceMapParams max_distance;
   MinConvexityMapParams min_convexity;
   SurfaceNormalParams normals;
+  SemanticInstanceSegmentationParams semantic_instance_segmentation;
+  bool visualize_segmented_scene = false;
 };
 
 void visualizeDepthMap(const cv::Mat& depth_map, cv::viz::Viz3d* viz_3d) {

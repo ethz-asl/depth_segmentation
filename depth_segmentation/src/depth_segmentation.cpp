@@ -734,18 +734,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                               const cv::Mat& normal_map, cv::Mat* labeled_map,
                               std::vector<cv::Mat>* segment_masks,
                               std::vector<Segment>* segments) {
-  // Dummy variable.
-  SemanticInstanceSegmentation instance_segmentation;
-  labelMap(rgb_image, depth_image, instance_segmentation, depth_map, edge_map,
-           normal_map, labeled_map, segment_masks, segments);
-}
-
-void DepthSegmenter::labelMap(
-    const cv::Mat& rgb_image, const cv::Mat& depth_image,
-    const SemanticInstanceSegmentation& instance_segmentation,
-    const cv::Mat& depth_map, const cv::Mat& edge_map,
-    const cv::Mat& normal_map, cv::Mat* labeled_map,
-    std::vector<cv::Mat>* segment_masks, std::vector<Segment>* segments) {
   CHECK(!rgb_image.empty());
   CHECK(!depth_image.empty());
   CHECK_EQ(depth_image.type(), CV_32FC1);
@@ -985,46 +973,6 @@ void DepthSegmenter::labelMap(
     }
   }
 
-  if (semantic_instance_segmentation_) {
-    int segment_size;
-    int mask_size;
-
-    for (size_t i = 0u; i < segments->size(); ++i) {
-      // For each DS segment identify the corresponding
-      // maximally overlapping mask, if any.
-      size_t maximally_overlapping_mask_index = 0u;
-      int max_overlap_size = 0;
-      segment_size = cv::countNonZero((*segment_masks)[i]);
-
-      for (size_t j = 0u; j < instance_segmentation.masks.size(); ++j) {
-        // Search through all masks to find the maximally overlapping one.
-        mask_size = cv::countNonZero(instance_segmentation.masks[j]);
-
-        cv::Mat mask_overlap;
-        cv::bitwise_and((*segment_masks)[i], instance_segmentation.masks[j],
-                        mask_overlap);
-
-        int overlap_size = cv::countNonZero(mask_overlap);
-        float normalized_overlap = (float)overlap_size / (float)segment_size;
-
-        // TODO(margaritaG): make normalized overlap threshold
-        if (overlap_size > max_overlap_size && normalized_overlap > 0.8f) {
-          maximally_overlapping_mask_index = j;
-          max_overlap_size = overlap_size;
-        }
-      }
-
-      if (max_overlap_size > 0) {
-        // Found a maximally overlapping mask, assign
-        // the corresponding semantic and instance labels.
-        (*segments)[i].semantic_label.insert(
-            instance_segmentation.labels[maximally_overlapping_mask_index]);
-        (*segments)[i].instance_label.insert(maximally_overlapping_mask_index +
-                                             1u);
-      }
-    }
-  }
-
   if (params_.label.use_inpaint) {
     inpaintImage(depth_image, edge_map, output, &output);
   }
@@ -1033,9 +981,55 @@ void DepthSegmenter::labelMap(
     static const std::string kWindowName = "LabelMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     imshow(kWindowName, output);
-    cv::waitKey(100);
+    cv::waitKey(1);
   }
   *labeled_map = output;
+}
+
+void DepthSegmenter::labelMap(
+    const cv::Mat& rgb_image, const cv::Mat& depth_image,
+    const SemanticInstanceSegmentation& instance_segmentation,
+    const cv::Mat& depth_map, const cv::Mat& edge_map,
+    const cv::Mat& normal_map, cv::Mat* labeled_map,
+    std::vector<cv::Mat>* segment_masks, std::vector<Segment>* segments) {
+  labelMap(rgb_image, depth_image, depth_map, edge_map, normal_map, labeled_map,
+           segment_masks, segments);
+
+  for (size_t i = 0u; i < segments->size(); ++i) {
+    // For each DS segment identify the corresponding
+    // maximally overlapping mask, if any.
+    size_t maximally_overlapping_mask_index = 0u;
+    int max_overlap_size = 0;
+    int segment_size = cv::countNonZero((*segment_masks)[i]);
+
+    for (size_t j = 0u; j < instance_segmentation.masks.size(); ++j) {
+      // Search through all masks to find the maximally overlapping one.
+      cv::Mat mask_overlap;
+      cv::bitwise_and((*segment_masks)[i], instance_segmentation.masks[j],
+                      mask_overlap);
+
+      int overlap_size = cv::countNonZero(mask_overlap);
+      float normalized_overlap = (float)overlap_size / (float)segment_size;
+
+      if (overlap_size > max_overlap_size &&
+          normalized_overlap >
+              params_.semantic_instance_segmentation.overlap_threshold) {
+        maximally_overlapping_mask_index = j;
+        max_overlap_size = overlap_size;
+      }
+    }
+
+    if (max_overlap_size > 0) {
+      // Found a maximally overlapping mask, assign
+      // the corresponding semantic and instance labels.
+      (*segments)[i].semantic_label.insert(
+          instance_segmentation.labels[maximally_overlapping_mask_index]);
+      // Instance label 0u corresponds to a segment with no overlapping
+      // mask, thus the assigned index is incremented by 1u.
+      (*segments)[i].instance_label.insert(maximally_overlapping_mask_index +
+                                           1u);
+    }
+  }
 }
 
 void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,

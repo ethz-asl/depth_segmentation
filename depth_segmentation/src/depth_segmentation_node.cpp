@@ -20,7 +20,9 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#ifdef MASKRCNNROS_AVAILABLE
 #include <mask_rcnn_ros/Result.h>
+#endif
 
 #include "depth_segmentation/depth_segmentation.h"
 #include "depth_segmentation/ros_common.h"
@@ -29,8 +31,9 @@ struct PointSurfelLabel {
   PCL_ADD_POINT4D;
   PCL_ADD_NORMAL4D;
   PCL_ADD_RGB;
-  uint8_t label;  // TODO(margaritaG) change field names.
-  uint8_t instance;
+  // TODO(margaritaG) change field names.
+  uint8_t label;     // semantic_label
+  uint8_t instance;  // instance_label
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
@@ -52,13 +55,13 @@ class DepthSegmentationNode {
         params_(),
         camera_tracker_(depth_camera_, rgb_camera_),
         depth_segmenter_(depth_camera_, params_) {
-    bool semantic_instance_segmentation = false;
-    node_handle_.param<bool>("semantic_instance_segmentation",
-                             semantic_instance_segmentation,
-                             semantic_instance_segmentation);
-
-    depth_segmenter_.semantic_instance_segmentation_ =
-        semantic_instance_segmentation;
+    node_handle_.param<bool>("semantic_instance_segmentation/enable",
+                             params_.semantic_instance_segmentation.enable,
+                             params_.semantic_instance_segmentation.enable);
+    node_handle_.param<float>(
+        "semantic_instance_segmentation/overlap_threshold",
+        params_.semantic_instance_segmentation.overlap_threshold,
+        params_.semantic_instance_segmentation.overlap_threshold);
 
     node_handle_.param<std::string>("depth_image_sub_topic", depth_image_topic_,
                                     depth_segmentation::kDepthImageTopic);
@@ -70,37 +73,46 @@ class DepthSegmentationNode {
     node_handle_.param<std::string>("rgb_camera_info_sub_topic",
                                     rgb_camera_info_topic_,
                                     depth_segmentation::kRgbCameraInfoTopic);
+    node_handle_.param<std::string>(
+        "semantic_instance_segmentation_sub_topic",
+        semantic_instance_segmentation_topic_,
+        depth_segmentation::kSemanticInstanceSegmentationTopic);
     node_handle_.param<std::string>("world_frame", world_frame_,
                                     depth_segmentation::kTfWorldFrame);
     node_handle_.param<std::string>("camera_frame", camera_frame_,
                                     depth_segmentation::kTfDepthCameraFrame);
 
     depth_image_sub_ = new image_transport::SubscriberFilter(
-        image_transport_, depth_image_topic_, 10);
-    rgb_image_sub_ = new image_transport::SubscriberFilter(
-        image_transport_, rgb_image_topic_, 10);
+        image_transport_, depth_image_topic_, 1);
+    rgb_image_sub_ = new image_transport::SubscriberFilter(image_transport_,
+                                                           rgb_image_topic_, 1);
     depth_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
-        node_handle_, depth_camera_info_topic_, 10);
+        node_handle_, depth_camera_info_topic_, 1);
     rgb_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
-        node_handle_, rgb_camera_info_topic_, 10);
+        node_handle_, rgb_camera_info_topic_, 1);
 
-    if (semantic_instance_segmentation) {
+    constexpr int kQueueSize = 10;
+    if (params_.semantic_instance_segmentation.enable) {
+#ifdef MASKRCNNROS_AVAILABLE
       instance_segmentation_sub_ =
           new message_filters::Subscriber<mask_rcnn_ros::Result>(
-              node_handle_,
-              depth_segmentation::kSemanticInstanceSegmentationTopic, 10);
+              node_handle_, semantic_instance_segmentation_topic_, 1);
 
       image_segmentation_sync_policy_ =
           new message_filters::Synchronizer<ImageSegmentationSyncPolicy>(
-              ImageSegmentationSyncPolicy(30), *depth_image_sub_,
+              ImageSegmentationSyncPolicy(kQueueSize), *depth_image_sub_,
               *rgb_image_sub_, *instance_segmentation_sub_);
 
       image_segmentation_sync_policy_->registerCallback(boost::bind(
           &DepthSegmentationNode::imageSegmentationCallback, this, _1, _2, _3));
-
+#else
+      ROS_WARN_STREAM(
+          "Semantic instance segmentation is not supported since "
+          "mask_rcnn_ros is disabled.");
+#endif
     } else {
       image_sync_policy_ = new message_filters::Synchronizer<ImageSyncPolicy>(
-          ImageSyncPolicy(30), *depth_image_sub_, *rgb_image_sub_);
+          ImageSyncPolicy(kQueueSize), *depth_image_sub_, *rgb_image_sub_);
 
       image_sync_policy_->registerCallback(
           boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
@@ -108,7 +120,7 @@ class DepthSegmentationNode {
 
     camera_info_sync_policy_ =
         new message_filters::Synchronizer<CameraInfoSyncPolicy>(
-            CameraInfoSyncPolicy(10), *depth_info_sub_, *rgb_info_sub_);
+            CameraInfoSyncPolicy(kQueueSize), *depth_info_sub_, *rgb_info_sub_);
 
     camera_info_sync_policy_->registerCallback(
         boost::bind(&DepthSegmentationNode::cameraInfoCallback, this, _1, _2));
@@ -118,6 +130,10 @@ class DepthSegmentationNode {
                                                          1000);
     point_cloud2_scene_pub_ =
         node_handle_.advertise<sensor_msgs::PointCloud2>("segmented_scene", 1);
+
+    node_handle_.param<bool>("visualize_segmented_scene",
+                             params_.visualize_segmented_scene,
+                             params_.visualize_segmented_scene);
   }
 
  private:
@@ -128,9 +144,13 @@ class DepthSegmentationNode {
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image,
                                                           sensor_msgs::Image>
       ImageSyncPolicy;
+
+#ifdef MASKRCNNROS_AVAILABLE
   typedef message_filters::sync_policies::ApproximateTime<
       sensor_msgs::Image, sensor_msgs::Image, mask_rcnn_ros::Result>
       ImageSegmentationSyncPolicy;
+#endif
+
   typedef message_filters::sync_policies::ApproximateTime<
       sensor_msgs::CameraInfo, sensor_msgs::CameraInfo>
       CameraInfoSyncPolicy;
@@ -150,14 +170,12 @@ class DepthSegmentationNode {
   std::string rgb_camera_info_topic_;
   std::string depth_image_topic_;
   std::string depth_camera_info_topic_;
+  std::string semantic_instance_segmentation_topic_;
   std::string world_frame_;
   std::string camera_frame_;
 
   image_transport::SubscriberFilter* depth_image_sub_;
   image_transport::SubscriberFilter* rgb_image_sub_;
-
-  message_filters::Subscriber<mask_rcnn_ros::Result>*
-      instance_segmentation_sub_;
 
   message_filters::Subscriber<sensor_msgs::CameraInfo>* depth_info_sub_;
   message_filters::Subscriber<sensor_msgs::CameraInfo>* rgb_info_sub_;
@@ -166,9 +184,15 @@ class DepthSegmentationNode {
   ros::Publisher point_cloud2_scene_pub_;
 
   message_filters::Synchronizer<ImageSyncPolicy>* image_sync_policy_;
+
+  message_filters::Synchronizer<CameraInfoSyncPolicy>* camera_info_sync_policy_;
+
+#ifdef MASKRCNNROS_AVAILABLE
+  message_filters::Subscriber<mask_rcnn_ros::Result>*
+      instance_segmentation_sub_;
   message_filters::Synchronizer<ImageSegmentationSyncPolicy>*
       image_segmentation_sync_policy_;
-  message_filters::Synchronizer<CameraInfoSyncPolicy>* camera_info_sync_policy_;
+#endif
 
   void publish_tf(const cv::Mat cv_transform, const ros::Time& timestamp) {
     // Rotate such that the world frame initially aligns with the camera_link
@@ -235,23 +259,23 @@ class DepthSegmentationNode {
     // https://github.com/ros-visualization/rviz/issues/689
     sensor_msgs::PointCloud2 pcl2_msg;
 
-    if (depth_segmenter_.semantic_instance_segmentation_) {
+    if (params_.semantic_instance_segmentation.enable) {
       pcl::PointCloud<PointSurfelLabel>::Ptr scene_pcl(
           new pcl::PointCloud<PointSurfelLabel>);
       for (depth_segmentation::Segment segment : segments) {
         CHECK_GT(segment.points.size(), 0u);
         pcl::PointCloud<PointSurfelLabel>::Ptr segment_pcl(
             new pcl::PointCloud<PointSurfelLabel>);
-        for (std::size_t i = 0; i < segment.points.size(); ++i) {
+        for (std::size_t i = 0u; i < segment.points.size(); ++i) {
           PointSurfelLabel point_pcl;
-          size_t label = 0u;
+          size_t semantic_label = 0u;
           size_t instance_label = 0u;
-          if (segment.instance_label.size() > 0) {
+          if (segment.instance_label.size() > 0u) {
             instance_label = *(segment.instance_label.begin());
-            label = *(segment.semantic_label.begin());
+            semantic_label = *(segment.semantic_label.begin());
           }
           fillPoint(segment.points[i], segment.normals[i],
-                    segment.original_colors[i], label, instance_label,
+                    segment.original_colors[i], semantic_label, instance_label,
                     &point_pcl);
 
           segment_pcl->push_back(point_pcl);
@@ -263,7 +287,9 @@ class DepthSegmentationNode {
         pcl2_msg.header.frame_id = header.frame_id;
         point_cloud2_segment_pub_.publish(pcl2_msg);
       }
-      pcl::toROSMsg(*scene_pcl, pcl2_msg);
+      if (params_.visualize_segmented_scene) {
+        pcl::toROSMsg(*scene_pcl, pcl2_msg);
+      }
     } else {
       pcl::PointCloud<pcl::PointSurfel>::Ptr scene_pcl(
           new pcl::PointCloud<pcl::PointSurfel>);
@@ -271,7 +297,7 @@ class DepthSegmentationNode {
         CHECK_GT(segment.points.size(), 0u);
         pcl::PointCloud<pcl::PointSurfel>::Ptr segment_pcl(
             new pcl::PointCloud<pcl::PointSurfel>);
-        for (std::size_t i = 0; i < segment.points.size(); ++i) {
+        for (std::size_t i = 0u; i < segment.points.size(); ++i) {
           pcl::PointSurfel point_pcl;
 
           fillPoint(segment.points[i], segment.normals[i],
@@ -286,14 +312,19 @@ class DepthSegmentationNode {
         pcl2_msg.header.frame_id = header.frame_id;
         point_cloud2_segment_pub_.publish(pcl2_msg);
       }
-      pcl::toROSMsg(*scene_pcl, pcl2_msg);
+      if (params_.visualize_segmented_scene) {
+        pcl::toROSMsg(*scene_pcl, pcl2_msg);
+      }
     }
 
-    pcl2_msg.header.stamp = header.stamp;
-    pcl2_msg.header.frame_id = header.frame_id;
-    point_cloud2_scene_pub_.publish(pcl2_msg);
+    if (params_.visualize_segmented_scene) {
+      pcl2_msg.header.stamp = header.stamp;
+      pcl2_msg.header.frame_id = header.frame_id;
+      point_cloud2_scene_pub_.publish(pcl2_msg);
+    }
   }
 
+#ifdef MASKRCNNROS_AVAILABLE
   void semanticInstanceSegmentationFromRosMsg(
       const mask_rcnn_ros::Result::ConstPtr& segmentation_msg,
       depth_segmentation::SemanticInstanceSegmentation*
@@ -302,7 +333,7 @@ class DepthSegmentationNode {
         segmentation_msg->masks.size());
     semantic_instance_segmentation->labels.reserve(
         segmentation_msg->masks.size());
-    for (int i = 0u; i < segmentation_msg->masks.size(); ++i) {
+    for (size_t i = 0u; i < segmentation_msg->masks.size(); ++i) {
       cv_bridge::CvImagePtr cv_mask_image;
       cv_mask_image = cv_bridge::toCvCopy(segmentation_msg->masks[i],
                                           sensor_msgs::image_encodings::MONO8);
@@ -312,6 +343,7 @@ class DepthSegmentationNode {
           segmentation_msg->class_ids[i]);
     }
   }
+#endif
 
   void preprocess(const sensor_msgs::Image::ConstPtr& depth_msg,
                   const sensor_msgs::Image::ConstPtr& rgb_msg,
@@ -328,6 +360,18 @@ class DepthSegmentationNode {
       cv_depth_image = cv_bridge::toCvCopy(
           depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
       *rescaled_depth = cv_depth_image->image;
+    }
+
+    constexpr double kZeroValue = 0.0;
+    cv::Mat nan_mask = *rescaled_depth != *rescaled_depth;
+    rescaled_depth->setTo(kZeroValue, nan_mask);
+
+    if (params_.dilate_depth_image) {
+      cv::Mat element = cv::getStructuringElement(
+          cv::MORPH_RECT, cv::Size(2u * params_.dilation_size + 1u,
+                                   2u * params_.dilation_size + 1u));
+      cv::morphologyEx(*rescaled_depth, *rescaled_depth, cv::MORPH_DILATE,
+                       element);
     }
 
     *bw_image = cv::Mat::zeros(cv_rgb_image->image.size(), CV_8UC1);
@@ -452,24 +496,20 @@ class DepthSegmentationNode {
                                   depth_map, edge_map, normal_map, &label_map,
                                   &segment_masks, &segments);
 
-        if (segments.size() > 0) {
+        if (segments.size() > 0u) {
           publish_segments(segments, depth_msg->header);
         }
-
-        // Update the member images to the new images.
-        // TODO(ff): Consider only doing this, when we are far enough away
-        // from a frame. (Which basically means we would set a keyframe.)
-        depth_camera_.setImage(rescaled_depth);
-        depth_camera_.setMask(mask);
-        rgb_camera_.setImage(bw_image);
-      } else {
-        depth_camera_.setImage(rescaled_depth);
-        depth_camera_.setMask(mask);
-        rgb_camera_.setImage(bw_image);
       }
+      // Update the member images to the new images.
+      // TODO(ff): Consider only doing this, when we are far enough away
+      // from a frame. (Which basically means we would set a keyframe.)
+      depth_camera_.setImage(rescaled_depth);
+      depth_camera_.setMask(mask);
+      rgb_camera_.setImage(bw_image);
     }
   }
 
+#ifdef MASKRCNNROS_AVAILABLE
   void imageSegmentationCallback(
       const sensor_msgs::Image::ConstPtr& depth_msg,
       const sensor_msgs::Image::ConstPtr& rgb_msg,
@@ -505,23 +545,20 @@ class DepthSegmentationNode {
                                   normal_map, &label_map, &segment_masks,
                                   &segments);
 
-        if (segments.size() > 0) {
+        if (segments.size() > 0u) {
           publish_segments(segments, depth_msg->header);
         }
-
-        // Update the member images to the new images.
-        // TODO(ff): Consider only doing this, when we are far enough away
-        // from a frame. (Which basically means we would set a keyframe.)
-        depth_camera_.setImage(rescaled_depth);
-        depth_camera_.setMask(mask);
-        rgb_camera_.setImage(bw_image);
-      } else {
-        depth_camera_.setImage(rescaled_depth);
-        depth_camera_.setMask(mask);
-        rgb_camera_.setImage(bw_image);
       }
+
+      // Update the member images to the new images.
+      // TODO(ff): Consider only doing this, when we are far enough away
+      // from a frame. (Which basically means we would set a keyframe.)
+      depth_camera_.setImage(rescaled_depth);
+      depth_camera_.setMask(mask);
+      rgb_camera_.setImage(bw_image);
     }
   }
+#endif
 
   void cameraInfoCallback(
       const sensor_msgs::CameraInfo::ConstPtr& depth_camera_info_msg,

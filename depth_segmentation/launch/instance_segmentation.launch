@@ -14,6 +14,6 @@
     <param name="rgb_image_sub_topic" value="$(arg rgb_topic)" />
     <param name="depth_camera_info_sub_topic" value="$(arg depth_camera_info_topic)" />
     <param name="rgb_camera_info_sub_topic" value="$(arg rgb_camera_info_topic)" />
-    <param name="semantic_instance_segmentation" value="true"/>
+    <param name="semantic_instance_segmentation/enable" value="false"/>
   </node>
 </launch>

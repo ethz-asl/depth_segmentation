@@ -172,8 +172,6 @@ class DepthSegmenter {
                  std::vector<std::vector<cv::Point2i>>* labels);
   inline DepthCamera getDepthCamera() const { return depth_camera_; }
 
-  bool semantic_instance_segmentation_;
-
  private:
   void generateRandomColorsAndLabels(size_t contours_size,
                                      std::vector<cv::Scalar>* colors,
