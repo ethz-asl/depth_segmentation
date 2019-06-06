@@ -92,6 +92,16 @@ class DepthSegmentationNode {
         node_handle_, rgb_camera_info_topic_, 1);
 
     constexpr int kQueueSize = 30;
+
+#ifndef MASKRCNNROS_AVAILABLE
+    if (params_.semantic_instance_segmentation.enable) {
+      params_.semantic_instance_segmentation.enable = false;
+      ROS_WARN_STREAM(
+          "Turning off semantic instance segmentation "
+          "as mask_rcnn_ros is disabled.");
+    }
+#endif
+
     if (params_.semantic_instance_segmentation.enable) {
 #ifdef MASKRCNNROS_AVAILABLE
       instance_segmentation_sub_ =
@@ -105,10 +115,6 @@ class DepthSegmentationNode {
 
       image_segmentation_sync_policy_->registerCallback(boost::bind(
           &DepthSegmentationNode::imageSegmentationCallback, this, _1, _2, _3));
-#else
-      ROS_WARN_STREAM(
-          "Semantic instance segmentation is not supported since "
-          "mask_rcnn_ros is disabled.");
 #endif
     } else {
       image_sync_policy_ = new message_filters::Synchronizer<ImageSyncPolicy>(
@@ -360,6 +366,8 @@ class DepthSegmentationNode {
       cv_depth_image = cv_bridge::toCvCopy(
           depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
       *rescaled_depth = cv_depth_image->image;
+    } else {
+      LOG(FATAL) << "Unknown depth image encoding.";
     }
 
     constexpr double kZeroValue = 0.0;

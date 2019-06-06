@@ -768,7 +768,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
       for (size_t i = 0u; i < contours.size(); ++i) {
         const double area = cv::contourArea(contours[i]);
         constexpr int kNoParentContour = -1;
-        constexpr bool kContourIsClosed = true;
         if (area < params_.label.min_size) {
           const int parent_contour = hierarchy[i][3];
           if (parent_contour == kNoParentContour) {
@@ -791,8 +790,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
           }
         }
       }
-      cv::namedWindow("edge", cv::WINDOW_AUTOSIZE);
-      imshow("edge", edge_map_8u * 100);
 
       cv::Mat output_labels =
           cv::Mat(depth_image.size(), CV_32SC1, cv::Scalar(0));
