@@ -91,7 +91,7 @@ class DepthSegmentationNode {
     rgb_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
         node_handle_, rgb_camera_info_topic_, 1);
 
-    constexpr int kQueueSize = 10;
+    constexpr int kQueueSize = 30;
     if (params_.semantic_instance_segmentation.enable) {
 #ifdef MASKRCNNROS_AVAILABLE
       instance_segmentation_sub_ =
