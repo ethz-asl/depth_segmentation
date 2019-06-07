@@ -31,9 +31,8 @@ struct PointSurfelLabel {
   PCL_ADD_POINT4D;
   PCL_ADD_NORMAL4D;
   PCL_ADD_RGB;
-  // TODO(margaritaG) change field names.
-  uint8_t label;     // semantic_label
-  uint8_t instance;  // instance_label
+  uint8_t instance_label;
+  uint8_t semantic_label;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
@@ -42,7 +41,8 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(
     PointSurfelLabel,
     (float, x, x)(float, y, y)(float, z, z)(float, normal_x, normal_x)(
         float, normal_y, normal_y)(float, normal_z, normal_z)(float, rgb, rgb)(
-        uint8_t, label, label)(uint8_t, instance, instance))
+        uint8_t, instance_label, instance_label)(uint8_t, semantic_label,
+                                                 semantic_label))
 
 class DepthSegmentationNode {
  public:
@@ -240,7 +240,7 @@ class DepthSegmentationNode {
   }
 
   void fillPoint(const cv::Vec3f& point, const cv::Vec3f& normals,
-                 const cv::Vec3f& colors, const size_t& label,
+                 const cv::Vec3f& colors, const size_t& semantic_label,
                  const size_t& instance_label, PointSurfelLabel* point_pcl) {
     point_pcl->x = point[0];
     point_pcl->y = point[1];
@@ -252,8 +252,8 @@ class DepthSegmentationNode {
     point_pcl->g = colors[1];
     point_pcl->b = colors[2];
 
-    point_pcl->label = label;
-    point_pcl->instance = instance_label;
+    point_pcl->semantic_label = semantic_label;
+    point_pcl->instance_label = instance_label;
   }
 
   void publish_segments(
@@ -274,8 +274,8 @@ class DepthSegmentationNode {
             new pcl::PointCloud<PointSurfelLabel>);
         for (std::size_t i = 0u; i < segment.points.size(); ++i) {
           PointSurfelLabel point_pcl;
-          size_t semantic_label = 0u;
-          size_t instance_label = 0u;
+          uint8_t semantic_label = 0u;
+          uint8_t instance_label = 0u;
           if (segment.instance_label.size() > 0u) {
             instance_label = *(segment.instance_label.begin());
             semantic_label = *(segment.semantic_label.begin());
