@@ -33,6 +33,30 @@ else()
   endif()
 endif()
 
+set(WITH_MASKRCNNROS ON)
+
+if (WITH_MASKRCNNROS)
+  find_package(mask_rcnn_ros QUIET)
+  if (NOT mask_rcnn_ros_FOUND)
+    message(WARNING "The semantic instance segmentation mode is enabled but the mask_rcnn_ros package could not be found, trying to build it.")
+    execute_process (
+        COMMAND catkin build mask_rcnn_ros
+        OUTPUT_VARIABLE build_log
+        ERROR_VARIABLE build_log
+    )
+    message(STATUS build_log)
+    find_package(mask_rcnn_ros QUIET)
+  endif()
+
+  if (mask_rcnn_ros_FOUND)
+    message(STATUS "mask_rcnn_ros is found.")
+    add_definitions(-DMASKRCNNROS_AVAILABLE)
+    include_directories(include ${catkin_INCLUDE_DIRS} ${mask_rcnn_ros_INCLUDE_DIRS} )
+  else()
+    message(WARNING "Could not find the mask_rcnn_ros package, please add the mask_rcnn_ros package to the current workspace for semantic instance segmentation support.")
+  endif()
+endif()
+
 
 cs_add_library(${PROJECT_NAME}
   src/depth_segmentation.cpp
