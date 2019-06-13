@@ -5,13 +5,14 @@
   <description>A depth_segmentation using the ICLCV library</description>
 
   <maintainer email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</maintainer>
+  
+  <author email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</author>
+  <author email="tonci.novkovic@mavt.ethz.ch">Tonci Novkovic</author>
+  <author email="marius.fehr@mavt.ethz.ch">Marius Fehr</author>
+  <author email="margarita.grinvald@mavt.ethz.ch">Margarita Grinvald</author>
+  <author email="abel.gawel@mavt.ethz.ch">Abel Gawel</author>
 
-  <author>Fadri Furrer</author>
-  <author>Tonci Novkovic</author>
-  <author>Abel Gawel</author>
-  <author>Marius Fehr</author>
-
-  <license>TODO</license>
+  <license>BSD 3</license>
 
   <buildtool_depend>catkin</buildtool_depend>
   <buildtool_depend>catkin_simple</buildtool_depend>

@@ -7,11 +7,13 @@
   <maintainer email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</maintainer>
   <maintainer email="marius.fehr@mavt.ethz.ch">Marius Fehr</maintainer>
   <maintainer email="tonci.novkovic@mavt.ethz.ch">Tonci Novkovic</maintainer>
-  <author>Fadri Furrer</author>
-  <author>Marius Fehr</author>
-  <author>Tonci Novkovic</author>
-  <author>Abel Gawel</author>
-  <license>BSD</license>
+
+  <author email="fadri.furrer@mavt.ethz.ch">Fadri Furrer</author>
+  <author email="marius.fehr@mavt.ethz.ch">Marius Fehr</author>
+  <author email="tonci.novkovic@mavt.ethz.ch">Tonci Novkovic</author>
+  <author email="margarita.grinvald@mavt.ethz.ch">Margarita Grinvald</author>
+  <author email="abel.gawel@mavt.ethz.ch">Abel Gawel</author>
+  <license>BSD 3</license>
 
   <buildtool_depend>catkin</buildtool_depend>
   <buildtool_depend>catkin_simple</buildtool_depend>
