@@ -3,6 +3,7 @@ This package provides geometric segmentation of depth images and an interface to
 **TODO** Add image(s)
 
 ## Installation
+**TODO**
 
 ## Usage
 The two use cases can be started as described below.
