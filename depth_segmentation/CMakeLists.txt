@@ -33,7 +33,7 @@ else()
   endif()
 endif()
 
-set(WITH_MASKRCNNROS ON)
+set(WITH_MASKRCNNROS OFF)
 
 if (WITH_MASKRCNNROS)
   find_package(mask_rcnn_ros QUIET)

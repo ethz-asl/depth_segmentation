@@ -1,0 +1,9 @@
+<launch>
+  <arg name="depth_segmentation_params_file" default="$(find depth_segmentation)/cfg/primesense_config.yaml"/>
+  <arg name="sensor_topics_file" default="$(find depth_segmentation)/cfg/primesense_topics.yaml"/>
+
+  <node name="depth_segmentation_node" pkg="depth_segmentation" type="depth_segmentation_node" output="log">
+    <rosparam command="load" file="$(arg sensor_topics_file)"/>
+    <rosparam command="load" file="$(arg depth_segmentation_params_file)"/>
+  </node>
+</launch>
