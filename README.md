@@ -3,16 +3,66 @@ This package provides geometric segmentation of depth images and an interface to
 **TODO** Add image(s)
 
 ## Installation
-**TODO**
+In your terminal, define the installed ROS version and name of the catkin workspace to use:
+```bash
+export ROS_VERSION=kinetic # (Ubuntu 16.04: kinetic, Ubuntu 18.04: melodic)
+export CATKIN_WS=~/catkin_ws
+```
+
+If you don't have a [catkin](http://wiki.ros.org/catkin) workspace yet, create a new one:
+```bash
+mkdir -p $CATKIN_WS/src && cd $CATKIN_WS
+catkin init
+catkin config --extend /opt/ros/$ROS_VERSION --merge-devel 
+catkin config --cmake-args -DCMAKE_CXX_STANDARD=14 -DCMAKE_BUILD_TYPE=Release
+wstool init src
+```
+
+Clone the `depth_segmentation` repository over HTTPS (no Github account required):
+```bash
+cd $CATKIN_WS/src
+git clone --recurse-submodules https://github.com/ethz-asl/depth_segmentation.git
+```
+
+Alternatively, clone over SSH (Github account required):
+```bash
+cd $CATKIN_WS/src
+git clone --recurse-submodules git@github.com:ethz-asl/depth_segmentation.git
+```
+
+Automatically fetch dependencies:
+```bash
+wstool merge -t . depth_segmentation/dependencies.rosinstall
+wstool update
+```
+
+Build and source the packages:
+```bash
+catkin build depth_segmentation
+source ../devel/setup.bash # (bash shell: ../devel/setup.bash,  zsh shell: ../devel/setup.zsh)
+```
+
+To compile it with Mask R-CNN support you'll need to set the `WITH_MASKRCNNROS` to `ON` in the `CMakeLists.txt` file:
+```cmake
+set(WITH_MASKRCNNROS ON)
+```
 
 ## Usage
 The two use cases can be started as described below.
 
 ### Geometric Segmentation
-**TODO**
+If you only want geometric segmentation, use:
+```bash
+roslaunch depth_segmentation depth_segmenatation.launch
+```
+You'll need to adjust the ros topic names in the `sensor_topics_file` (by default this is in `depth_segmentation//cfg/primesense_topics.yaml`). The depth segmentation parameters can be adjusted via dynamic reconfigure or in the `depth_segmentation_params_file` directly.
 
 ### Combined Geometric Segmentation with Semantics
-**TODO**
+To additionally run the semantic segmentation you can use this command:
+```bash
+roslaunch depth_segmentation semantic_instance_segmentation.launch
+```
+**NOTE** This only works if you have compiled `depth_segmentation` with Mask R-CNN enabled (`WITH_MASKRCNNROS=ON`).
 
 ## Citing
 If you use this, please cite:
@@ -45,4 +95,4 @@ If you also use the semantic segmentation, additionally cite:
 }
 ```
 ## License
-The code is available under the [BSD-3-Clause license](https://github.com/ethz-asl/voxblox-plusplus/blob/master/LICENSE).
+The code is available under the [BSD-3-Clause license](https://github.com/ethz-asl/depth_segmentation/blob/master/LICENSE).
