@@ -417,8 +417,7 @@ class DepthSegmentationNode {
 #endif  // DISPLAY_DEPTH_IMAGES
 
     // Compute transform from tracker.
-    constexpr bool kUseTracker = false;
-    if (kUseTracker) {
+    if (depth_segmentation::kUseTracker) {
       if (camera_tracker_.computeTransform(bw_image, rescaled_depth, mask)) {
         publish_tf(camera_tracker_.getWorldTransform(),
                    depth_msg->header.stamp);
@@ -490,7 +489,8 @@ class DepthSegmentationNode {
       preprocess(depth_msg, rgb_msg, &rescaled_depth, cv_rgb_image,
                  cv_depth_image, &bw_image, &mask);
       if (!camera_tracker_.getRgbImage().empty() &&
-          !camera_tracker_.getDepthImage().empty()) {
+              !camera_tracker_.getDepthImage().empty() ||
+          !depth_segmentation::kUseTracker) {
         computeEdgeMap(depth_msg, rgb_msg, rescaled_depth, cv_rgb_image,
                        cv_depth_image, bw_image, mask, &depth_map, &normal_map,
                        &edge_map);
@@ -539,7 +539,8 @@ class DepthSegmentationNode {
       preprocess(depth_msg, rgb_msg, &rescaled_depth, cv_rgb_image,
                  cv_depth_image, &bw_image, &mask);
       if (!camera_tracker_.getRgbImage().empty() &&
-          !camera_tracker_.getDepthImage().empty()) {
+              !camera_tracker_.getDepthImage().empty() ||
+          !depth_segmentation::kUseTracker) {
         computeEdgeMap(depth_msg, rgb_msg, rescaled_depth, cv_rgb_image,
                        cv_depth_image, bw_image, mask, &depth_map, &normal_map,
                        &edge_map);
@@ -618,6 +619,7 @@ class DepthSegmentationNode {
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
+  FLAGS_stderrthreshold = 0;
 
   LOG(INFO) << "Starting depth segmentation ... ";
   ros::init(argc, argv, "depth_segmentation_node");

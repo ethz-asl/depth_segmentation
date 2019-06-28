@@ -24,6 +24,7 @@ struct Segment {
 };
 
 const static std::string kDebugWindowName = "DebugImages";
+constexpr bool kUseTracker = false;
 
 enum class SurfaceNormalEstimationMethod {
   kFals = cv::rgbd::RgbdNormals::RGBD_NORMALS_METHOD_FALS,
