@@ -2,6 +2,8 @@
 This package provides geometric segmentation of depth images and an interface to semantic instance segmentation, where the output of a semantic instance segmentation of RGB images gets combined with the geometric instance segmentation. For the later case we assign each geometric segment a semantic label as well.
 **TODO** Add image(s)
 
+If you are interested in a global segmentation map, please also take a look at [voxblox-plusplus](https://github.com/ethz-asl/voxblox-plusplus).
+
 ## Installation
 In your terminal, define the installed ROS version and name of the catkin workspace to use:
 ```bash
