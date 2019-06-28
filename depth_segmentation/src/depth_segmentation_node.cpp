@@ -481,8 +481,10 @@ class DepthSegmentationNode {
                      const sensor_msgs::Image::ConstPtr& rgb_msg) {
     if (camera_info_ready_) {
       cv_bridge::CvImagePtr cv_rgb_image, cv_depth_image;
-      cv_rgb_image =
-          cv_bridge::toCvCopy(rgb_msg, sensor_msgs::image_encodings::BGR8);
+      cv_rgb_image = cv_bridge::toCvCopy(rgb_msg, rgb_msg->encoding);
+      if (rgb_msg->encoding == sensor_msgs::image_encodings::BGR8) {
+        cv::cvtColor(cv_rgb_image->image, cv_rgb_image->image, CV_BGR2RGB);
+      }
 
       cv::Mat rescaled_depth, bw_image, mask, depth_map, normal_map, edge_map;
       preprocess(depth_msg, rgb_msg, &rescaled_depth, cv_rgb_image,
@@ -528,8 +530,10 @@ class DepthSegmentationNode {
 
     if (camera_info_ready_) {
       cv_bridge::CvImagePtr cv_rgb_image, cv_depth_image;
-      cv_rgb_image =
-          cv_bridge::toCvCopy(rgb_msg, sensor_msgs::image_encodings::BGR8);
+      cv_rgb_image = cv_bridge::toCvCopy(rgb_msg, rgb_msg->encoding);
+      if (rgb_msg->encoding == sensor_msgs::image_encodings::BGR8) {
+        cv::cvtColor(cv_rgb_image->image, cv_rgb_image->image, CV_BGR2RGB);
+      }
 
       cv::Mat rescaled_depth, bw_image, mask, depth_map, normal_map, edge_map;
       preprocess(depth_msg, rgb_msg, &rescaled_depth, cv_rgb_image,
