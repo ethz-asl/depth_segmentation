@@ -535,7 +535,8 @@ class DepthSegmentationNode {
       preprocess(depth_msg, rgb_msg, &rescaled_depth, cv_rgb_image,
                  cv_depth_image, &bw_image, &mask);
       if (!camera_tracker_.getRgbImage().empty() &&
-          !camera_tracker_.getDepthImage().empty()) {
+              !camera_tracker_.getDepthImage().empty() ||
+          !depth_segmentation::kUseTracker) {
         computeEdgeMap(depth_msg, rgb_msg, rescaled_depth, cv_rgb_image,
                        cv_depth_image, bw_image, mask, &depth_map, &normal_map,
                        &edge_map);
