@@ -71,6 +71,11 @@ cs_add_executable(${PROJECT_NAME}_node
 )
 target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
 
+cs_add_executable(${PROJECT_NAME}_only_node
+  src/depth_segmentation_only_node.cpp
+)
+target_link_libraries(${PROJECT_NAME}_only_node ${PROJECT_NAME})
+
 # COPY TEST DATA
 # TODO(ff): We should move the test data to an external repo or a cloud at some point.
 # add_custom_target(test_data)

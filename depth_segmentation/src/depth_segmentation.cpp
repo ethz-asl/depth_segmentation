@@ -728,6 +728,16 @@ void DepthSegmenter::generateRandomColorsAndLabels(
   *labels = labels_;
 }
 
+void DepthSegmenter::labelMap(const cv::Mat& depth_image,
+                              const cv::Mat& depth_map, const cv::Mat& edge_map,
+                              const cv::Mat& normal_map, cv::Mat* labeled_map,
+                              std::vector<cv::Mat>* segment_masks,
+                              std::vector<Segment>* segments) {
+  cv::Mat rgb_image = cv::Mat::zeros(depth_image.size(), CV_8UC3);
+  labelMap(rgb_image, depth_image, depth_map, edge_map, normal_map, labeled_map,
+           segment_masks, segments);
+}
+
 void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
                               const cv::Mat& depth_image,
                               const cv::Mat& depth_map, const cv::Mat& edge_map,
