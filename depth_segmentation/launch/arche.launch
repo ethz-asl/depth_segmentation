@@ -1,27 +1,21 @@
 <?xml version="1.0"?>
 <launch>
-
-
-    <!-- <param name="/use_sime_time" value="true"/> -->
-
-    <node name="lidar_depth_map" type="lidar_depth_map_node" pkg="lidar_depth_map" output="screen" >
-      <rosparam command="load" file="$(find depth_segmentation)/cfg/menzi_depth_conversion.yaml" />
-      <remap from="/point_cloud_in" to="/velodyne_points_self_filtered" />
-      <!-- <remap from="/point_cloud_in" to="velodyne_vertical/velodyne_points" /> -->
-      <!-- <remap from="/point_cloud_in" to="velodyne_horizontal/velodyne_points" /> -->
-    </node>
+  <node name="lidar_depth_map" type="lidar_depth_map_node" pkg="lidar_depth_map" output="screen" >
+    <rosparam command="load" file="$(find depth_segmentation)/cfg/menzi_depth_conversion.yaml" />
+    <remap from="/point_cloud_in" to="/velodyne_points_self_filtered" />
+    <!-- <remap from="/point_cloud_in" to="velodyne_vertical/velodyne_points" /> -->
+    <!-- <remap from="/point_cloud_in" to="velodyne_horizontal/velodyne_points" /> -->
+  </node>
 
   <node pkg="tf2_ros" type="static_transform_publisher" name="cabin_velodynehbase_static_tf"
     args="0.75 0.42 2.06 -0.008037 0.300322 -0.001766 0.953802 CABIN velodyne_horizontal_base_link"/>
   <node pkg="tf2_ros" type="static_transform_publisher" name="velodynehbase_velodyneh_static_tf"
     args="0 0 0.0377 0 0 0 1 velodyne_horizontal_base_link velodyne_horizontal"/>
 
-
   <node pkg="tf2_ros" type="static_transform_publisher" name="cabin_velodynevbase_static_tf"
     args="0.69 0.57 2.08 0.703952 -0.066722 -0.060384 0.704524 CABIN velodyne_vertical_base_link"/>
   <node pkg="tf2_ros" type="static_transform_publisher" name="velodynevbase_velodynev_static_tf"
     args="0 0 0.0377 0 0 0 1 velodyne_vertical_base_link velodyne_vertical"/>
-
 
   <arg name="depth_segmentation_params_file" default="$(find depth_segmentation)/cfg/menzi.yaml"/>
   <arg name="sensor_topics_file" default="$(find depth_segmentation)/cfg/primesense_topics.yaml"/>
