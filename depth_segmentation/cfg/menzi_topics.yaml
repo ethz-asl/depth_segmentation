@@ -1,0 +1,6 @@
+depth_image_sub_topic: /depth_registered/image
+rgb_image_sub_topic: /rgb_undistorted/image
+depth_camera_info_sub_topic: /depth_registered/camera_info
+rgb_camera_info_sub_topic: /rgb_undistorted/camera_info
+world_frame_id: "map"
+imu_frame_id: "virtual_depth_camera"

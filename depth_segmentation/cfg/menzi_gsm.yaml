@@ -1,0 +1,47 @@
+segment_point_cloud_topic: "/depth_segmentation_only_node/object_segment"
+publish_feature_blocks_marker: true
+use_label_propagation: true
+
+voxblox:
+  voxel_size: 0.1
+  voxels_per_side: 8
+  truncation_distance_factor: 3.0
+  voxel_carving_enabled: false
+  max_ray_length_m: 10
+
+pairwise_confidence_merging:
+  enable_pairwise_confidence_merging: true
+  merging_min_overlap_ratio: 0.1
+  merging_min_frame_count: 2
+
+object_database:
+  publish_gsm_updates: true
+  max_segment_age: 10
+  scene_gsm_update_topic: "gsm_updates"
+  segment_gsm_update_topic: "gsm_updates"
+  validate_merged_object: "validate_merged_object"
+  min_number_of_allocated_blocks_to_publish: 500
+
+meshing:
+  publish_segment_mesh: true
+  publish_scene_mesh: true
+  mesh_filename: "garage_mesh.ply"
+  update_mesh_every_n_sec: 0.0
+  compute_and_publish_bbox: false
+  min_weight: 3
+
+sliding_window:
+  is_on: false
+  radius_m: 1.0
+
+  # Between 0 and 1. As soon as the distance between sliding window and camera
+  # is larger than this fraction times the window radius, the window is updated
+  # and its position is set equal the camera position.
+  update_fraction: 0.5
+
+icp:
+  enable_icp: false
+  keep_track_of_icp_correction: true
+
+semantic_instance_segmentation:
+  enable_semantic_instance_segmentation: false

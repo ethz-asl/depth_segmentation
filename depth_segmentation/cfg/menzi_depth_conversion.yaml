@@ -1,0 +1,11 @@
+width: 400
+height: 32
+fx: 200
+fy: 24
+cx: 100
+cy: 16
+rot_z: -90.0
+rot_y: 0.0
+rot_x: -90.0
+lidar_frame: velodyne_vertical
+camera_frame: virtual_depth_camera
