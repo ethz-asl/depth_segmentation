@@ -23,7 +23,7 @@
   <node name="depth_segmentation_only_node" pkg="depth_segmentation" type="depth_segmentation_only_node" output="log">
     <rosparam command="load" file="$(arg sensor_topics_file)"/>
     <rosparam command="load" file="$(arg depth_segmentation_params_file)"/>
-    <remap from="/camera/depth/image_raw" to="/lidar_depth_map/image" />
+    <remap from="/camera/depth/image_raw" to="/lidar_depth_map/depth_image" />
     <remap from="/camera/depth/camera_info" to="/lidar_depth_map/camera_info" />
   </node>
 

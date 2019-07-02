@@ -3,9 +3,9 @@ publish_feature_blocks_marker: true
 use_label_propagation: true
 
 voxblox:
-  voxel_size: 0.1
+  voxel_size: 0.03
   voxels_per_side: 8
-  truncation_distance_factor: 3.0
+  truncation_distance_factor: 5.0
   voxel_carving_enabled: false
   max_ray_length_m: 10
 
