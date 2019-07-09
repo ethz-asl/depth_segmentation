@@ -749,6 +749,10 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
 
   constexpr size_t kMaskValue = 255u;
 
+  cv::Mat original_depth_map;
+  cv::rgbd::depthTo3d(depth_image, depth_camera_.getCameraMatrix(),
+                      original_depth_map);
+
   cv::Mat output = cv::Mat::zeros(depth_image.size(), CV_8UC3);
   switch (params_.label.method) {
     case LabelMapMethod::kContour: {
@@ -879,7 +883,7 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
           } else {
             // Append vectors from depth_map and normals from normal_map to
             // vectors of segments.
-            cv::Vec3f point = depth_map.at<cv::Vec3f>(y, x);
+            cv::Vec3f point = original_depth_map.at<cv::Vec3f>(y, x);
             cv::Vec3f normal = normal_map.at<cv::Vec3f>(y, x);
             cv::Vec3b original_color = rgb_image.at<cv::Vec3b>(y, x);
             cv::Vec3f color_f;
