@@ -883,7 +883,6 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
           } else {
             // Append vectors from depth_map and normals from normal_map to
             // vectors of segments.
-
             cv::Vec3f point = original_depth_map.at<cv::Vec3f>(y, x);
             cv::Vec3f normal = normal_map.at<cv::Vec3f>(y, x);
             cv::Vec3b original_color = rgb_image.at<cv::Vec3b>(y, x);
