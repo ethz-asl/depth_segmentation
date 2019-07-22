@@ -388,6 +388,8 @@ class DepthSegmentationNode {
                                    2u * params_.dilation_size + 1u));
       cv::morphologyEx(*rescaled_depth, *dilated_rescaled_depth,
                        cv::MORPH_DILATE, element);
+    } else {
+      *dilated_rescaled_depth = *rescaled_depth;
     }
 
     *bw_image = cv::Mat::zeros(cv_rgb_image->image.size(), CV_8UC1);
@@ -541,26 +543,29 @@ class DepthSegmentationNode {
                                            &instance_segmentation);
 
     if (camera_info_ready_) {
-      cv_bridge::CvImagePtr cv_rgb_image, cv_depth_image;
+      cv_bridge::CvImagePtr cv_rgb_image(new cv_bridge::CvImage);
       cv_rgb_image = cv_bridge::toCvCopy(rgb_msg, rgb_msg->encoding);
       if (rgb_msg->encoding == sensor_msgs::image_encodings::BGR8) {
         cv::cvtColor(cv_rgb_image->image, cv_rgb_image->image, CV_BGR2RGB);
       }
 
-      cv::Mat rescaled_depth, bw_image, mask, depth_map, normal_map, edge_map;
-      preprocess(depth_msg, rgb_msg, &rescaled_depth, cv_rgb_image,
-                 cv_depth_image, &bw_image, &mask);
+      cv_bridge::CvImagePtr cv_depth_image(new cv_bridge::CvImage);
+      cv::Mat rescaled_depth, dilated_rescaled_depth, bw_image, mask, depth_map,
+          normal_map, edge_map;
+      preprocess(depth_msg, rgb_msg, &rescaled_depth, &dilated_rescaled_depth,
+                 cv_rgb_image, cv_depth_image, &bw_image, &mask);
       if (!camera_tracker_.getRgbImage().empty() &&
               !camera_tracker_.getDepthImage().empty() ||
           !depth_segmentation::kUseTracker) {
-        computeEdgeMap(depth_msg, rgb_msg, rescaled_depth, cv_rgb_image,
+        computeEdgeMap(depth_msg, rgb_msg, dilated_rescaled_depth, cv_rgb_image,
                        cv_depth_image, bw_image, mask, &depth_map, &normal_map,
                        &edge_map);
 
         cv::Mat label_map(edge_map.size(), CV_32FC1);
         cv::Mat remove_no_values =
             cv::Mat::zeros(edge_map.size(), edge_map.type());
-        edge_map.copyTo(remove_no_values, rescaled_depth == rescaled_depth);
+        edge_map.copyTo(remove_no_values,
+                        dilated_rescaled_depth == dilated_rescaled_depth);
         edge_map = remove_no_values;
         std::vector<depth_segmentation::Segment> segments;
         std::vector<cv::Mat> segment_masks;
