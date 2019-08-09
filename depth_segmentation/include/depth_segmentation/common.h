@@ -196,6 +196,7 @@ void computeCovariance(const cv::Mat& neighborhood, const cv::Vec3f& mean,
   covariance->at<float>(1, 0) = covariance->at<float>(0, 1);
   covariance->at<float>(2, 0) = covariance->at<float>(0, 2);
   covariance->at<float>(2, 1) = covariance->at<float>(1, 2);
+  CHECK_GT(cv::countNonZero(*covariance), 0) << *covariance;
 }
 
 size_t findNeighborhood(const cv::Mat& depth_map, const size_t window_size,
@@ -305,6 +306,19 @@ void computeOwnNormals(const SurfaceNormalParams& params,
         for (size_t coordinate = 0u; coordinate < 3u; ++coordinate) {
           normals->at<cv::Vec3f>(y, x)[coordinate] =
               eigenvectors.at<float>(n_th_eigenvector, coordinate);
+        }
+        if (y == depth_map.rows / 2 - 1 || y == depth_map.rows / 2 ||
+            y == depth_map.rows / 2 + 1) {
+          if (x == depth_map.cols / 2 - 1 || x == depth_map.cols / 2 ||
+              x == depth_map.cols / 2 + 1) {
+            LOG(ERROR) << "x: " << x << " y: " << y
+                       << " p: " << depth_map.at<cv::Vec3f>(y, x) << "\n\n"
+                       << " neighborhood: " << neighborhood << " mean: " << mean
+                       << " covariance: " << covariance
+                       << " eigenvalues: " << eigenvalues
+                       << " eigenvectors: " << eigenvectors
+                       << " \n \n NORMALS: " << normals->at<cv::Vec3f>(y, x);
+          }
         }
         // Re-Orient normals to point towards camera.
         if (normals->at<cv::Vec3f>(y, x)[2] > 0.0f) {

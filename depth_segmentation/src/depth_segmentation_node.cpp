@@ -506,6 +506,9 @@ class DepthSegmentationNode {
         computeEdgeMap(depth_msg, rgb_msg, dilated_rescaled_depth, cv_rgb_image,
                        cv_depth_image, bw_image, mask, &depth_map, &normal_map,
                        &edge_map);
+        // cv::FileStorage descirptors_file("/tmp/test_3d_points.yaml",
+        //                                  cv::FileStorage::WRITE);
+        // descirptors_file << "points" << depth_map;
 
         cv::Mat label_map(edge_map.size(), CV_32FC1);
         cv::Mat remove_no_values =

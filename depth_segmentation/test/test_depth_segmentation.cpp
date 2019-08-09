@@ -320,7 +320,7 @@ TEST_F(DepthSegmentationTest, DISABLED_testConvexity) {
   EXPECT_EQ(cv::countNonZero(expected_convexity != min_convexity_map), 0);
 }
 
-TEST_F(DepthSegmentationTest, testConvexity2) {
+TEST_F(DepthSegmentationTest, DISABLED_testConvexity2) {
   static constexpr size_t kNormalImageWidth = 640u;
   static constexpr size_t kNormalImageHeight = 480u;
   cv::Size image_size(kNormalImageWidth, kNormalImageHeight);
@@ -352,32 +352,6 @@ TEST_F(DepthSegmentationTest, testConvexity2) {
 
   float z_distance = kZMinDistance;
 
-  // for (size_t y = 0u; y < kNormalImageHeight; ++y) {
-  //   z_distance = kZMinDistance;
-  //   for (size_t x = 0u; x < kNormalImageWidth; ++x) {
-  //     depth_map.at<cv::Vec3f>(y, x) =
-  //         cv::Vec3f((x - cx) / fx, (y - cy) / fy, z_distance);
-  //     if (x < kNormalImageWidth / 2u - 1u + 10) {
-  //       concave_normals.at<cv::Vec3f>(y, x) = xz_to_left_normal;
-  //       z_distance -= kZStep;
-  //     } else if (x == (kNormalImageWidth / 2u - 1u + 10)) {
-  //       expected_convexity.at<float>(y, x) = 0.0f;
-  //       concave_normals.at<cv::Vec3f>(y, x) = xz_to_left_normal;
-  //       if (y == 0u) {
-  //       }
-  //     } else if (x == (kNormalImageWidth / 2u)) {
-  //       if (y == 0u) {
-  //       }
-  //       expected_convexity.at<float>(y, x) = 0.0f;
-  //       concave_normals.at<cv::Vec3f>(y, x) = xz_to_right_normal;
-  //       z_distance += kZStep;
-  //     } else {
-  //       concave_normals.at<cv::Vec3f>(y, x) = xz_to_right_normal;
-  //       z_distance += kZStep;
-  //     }
-  //   }
-  // }
-
   for (size_t y = 0u; y < kNormalImageHeight; ++y) {
     double y_3d =
         (y - kNormalImageHeight / 2.0) * 5.0 / (kNormalImageHeight / 2.0);
@@ -388,7 +362,7 @@ TEST_F(DepthSegmentationTest, testConvexity2) {
           10.0 * std::sin(std::sqrt(x_3d * x_3d + y_3d * y_3d)) + 11.0;
 
       depth_map.at<cv::Vec3f>(y, x) = cv::Vec3f(x_3d, y_3d, z_3d);
-      depth_image.at<float>(y, x) = static_cast<float>(z_3d / 11.0);
+      depth_image.at<float>(y, x) = static_cast<float>(z_3d);
     }
   }
   cv::Mat normal_map(image_size, CV_32FC3);
@@ -399,7 +373,71 @@ TEST_F(DepthSegmentationTest, testConvexity2) {
                                           &min_convexity_map);
   static const std::string kDepthWindowName = "depthTest";
   cv::namedWindow(kDepthWindowName, cv::WINDOW_AUTOSIZE);
-  cv::imshow(kDepthWindowName, depth_image);
+  cv::imshow(kDepthWindowName, depth_image / 21.0);
+  static const std::string kNormalWindowName = "normalTest";
+  cv::namedWindow(kNormalWindowName, cv::WINDOW_AUTOSIZE);
+  cv::imshow(kNormalWindowName, -normal_map);
+  static const std::string kConvexityWindowName = "convexityTest";
+  cv::namedWindow(kConvexityWindowName, cv::WINDOW_AUTOSIZE);
+  cv::imshow(kConvexityWindowName, min_convexity_map / 2.0);
+  // static const std::string kConvexityGTWindowName = "convexityGTTest";
+  // cv::namedWindow(kConvexityGTWindowName, cv::WINDOW_AUTOSIZE);
+  // cv::imshow(kConvexityGTWindowName, expected_convexity);
+  cv::viz::Viz3d viz_3d("Pointcloud with Normals");
+  visualizeDepthMapWithNormals(depth_map, normal_map, &viz_3d);
+  cv::waitKey(0);
+
+  // EXPECT_EQ(cv::countNonZero(expected_convexity != min_convexity_map), 0);
+}
+
+TEST_F(DepthSegmentationTest, testConvexity2) {
+  static constexpr size_t kNormalImageWidth = 224u;
+  static constexpr size_t kNormalImageHeight = 172u;
+  cv::Size image_size(kNormalImageWidth, kNormalImageHeight);
+  cv::Mat concave_normals(image_size, CV_32FC3);
+  cv::Mat depth_map(image_size, CV_32FC3);
+  cv::Mat depth_image(image_size, CV_32FC1);
+  cv::Vec3f xz_to_right_normal;
+  xz_to_right_normal[0] = cv::sqrt(2.0) / 2.0f;
+  xz_to_right_normal[1] = 0.0f;
+  xz_to_right_normal[2] = -cv::sqrt(2.0) / 2.0f;
+  cv::Vec3f xz_to_left_normal;
+  xz_to_left_normal[0] = -cv::sqrt(2.0) / 2.0f;
+  xz_to_left_normal[1] = 0.0f;
+  xz_to_left_normal[2] = -cv::sqrt(2.0) / 2.0f;
+  cv::Vec3f z_normal;
+  z_normal[0] = 0.0f;
+  z_normal[1] = 0.0f;
+  z_normal[2] = -1.0f;
+
+  // We are expecting the concavities at half the image width (2px wide).
+  cv::Mat expected_convexity = cv::Mat::ones(image_size, CV_32FC1);
+  const float fx = depth_camera_.getCameraMatrix().at<float>(0, 0);
+  const float fy = depth_camera_.getCameraMatrix().at<float>(1, 1);
+  const float cx = depth_camera_.getCameraMatrix().at<float>(0, 2);
+  const float cy = depth_camera_.getCameraMatrix().at<float>(1, 2);
+
+  const float kZMinDistance = 0.6f;
+  const float kZStep = 1.0f / fx;
+
+  float z_distance = kZMinDistance;
+  cv::FileStorage points(
+      "/media/mobmi/HDD/monstah_ws/src/depth_segmentation/depth_segmentation/"
+      "test/data/test_3d_points.yaml",
+      cv::FileStorage::READ);
+  points["points"] >> depth_map;
+  // LOG(ERROR) << points["points"].operator std::string();
+  cv::Mat normal_map(image_size, CV_32FC3);
+  params_.normals.window_size = 11u;
+  params_.normals.distance_factor_threshold = 0.05;
+  depth_segmenter_.computeNormalMap(depth_map, &normal_map);
+
+  cv::Mat min_convexity_map(image_size, CV_32FC1);
+  depth_segmenter_.computeMinConvexityMap(depth_map, normal_map,
+                                          &min_convexity_map);
+  static const std::string kDepthWindowName = "depthTest";
+  cv::namedWindow(kDepthWindowName, cv::WINDOW_AUTOSIZE);
+  cv::imshow(kDepthWindowName, depth_image / 21.0);
   static const std::string kNormalWindowName = "normalTest";
   cv::namedWindow(kNormalWindowName, cv::WINDOW_AUTOSIZE);
   cv::imshow(kNormalWindowName, -normal_map);
