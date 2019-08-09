@@ -587,7 +587,7 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
   }
 
   if (params_.min_convexity.display) {
-    static const std::string kWindowName = "MinConcavityMap";
+    static const std::string kWindowName = "MinConvexityMap";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     cv::imshow(kWindowName, *min_convexity_map);
     cv::waitKey(1);
@@ -1078,7 +1078,7 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
     depth_segmenter.computeNormalMap(depth_map, normal_map);
   } else if (params.normals.method ==
              depth_segmentation::SurfaceNormalEstimationMethod::kLinemod) {
-    depth_segmenter.computeNormalMap(depth_image, normal_map);
+    depth_segmenter.computeNormalMap(rescaled_depth, normal_map);
   }
 
   // Compute depth discontinuity map.
