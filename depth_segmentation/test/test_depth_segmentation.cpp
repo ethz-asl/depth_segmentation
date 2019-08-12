@@ -27,7 +27,7 @@ class DepthSegmentationTest : public ::testing::Test {
     params_.normals.distance_factor_threshold = 20.0;
     params_.min_convexity.use_threshold = false;
     params_.min_convexity.display = true;
-    params_.min_convexity.mask_threshold = -0.005;
+    params_.min_convexity.mask_threshold = -1.0e-9;
 
     params_.depth_discontinuity.display = true;
     params_.final_edge.display = true;
@@ -246,8 +246,8 @@ TEST_F(DepthSegmentationTest, DISABLED_testNormals2) {
 }
 
 TEST_F(DepthSegmentationTest, DISABLED_testConvexity) {
-  static constexpr size_t kNormalImageWidth = 640u;
-  static constexpr size_t kNormalImageHeight = 480u;
+  static constexpr size_t kNormalImageWidth = 6u;
+  static constexpr size_t kNormalImageHeight = 6u;
   cv::Size image_size(kNormalImageWidth, kNormalImageHeight);
   cv::Mat concave_normals(image_size, CV_32FC3);
   cv::Mat depth_map(image_size, CV_32FC3);
@@ -301,6 +301,8 @@ TEST_F(DepthSegmentationTest, DISABLED_testConvexity) {
       }
     }
   }
+  // cv::Mat normal_map(image_size, CV_32FC3);
+  depth_segmenter_.computeNormalMap(depth_map, &concave_normals);
   cv::Mat min_convexity_map(image_size, CV_32FC1);
   depth_segmenter_.computeMinConvexityMap(depth_map, concave_normals,
                                           &min_convexity_map);
@@ -315,7 +317,7 @@ TEST_F(DepthSegmentationTest, DISABLED_testConvexity) {
   cv::imshow(kConvexityGTWindowName, expected_convexity);
   cv::viz::Viz3d viz_3d("Pointcloud with Normals");
   visualizeDepthMapWithNormals(depth_map, concave_normals, &viz_3d);
-  // cv::waitKey(0);
+  cv::waitKey(0);
 
   EXPECT_EQ(cv::countNonZero(expected_convexity != min_convexity_map), 0);
 }
@@ -379,7 +381,7 @@ TEST_F(DepthSegmentationTest, DISABLED_testConvexity2) {
   cv::imshow(kNormalWindowName, -normal_map);
   static const std::string kConvexityWindowName = "convexityTest";
   cv::namedWindow(kConvexityWindowName, cv::WINDOW_AUTOSIZE);
-  cv::imshow(kConvexityWindowName, min_convexity_map / 2.0);
+  cv::imshow(kConvexityWindowName, min_convexity_map);
   // static const std::string kConvexityGTWindowName = "convexityGTTest";
   // cv::namedWindow(kConvexityGTWindowName, cv::WINDOW_AUTOSIZE);
   // cv::imshow(kConvexityGTWindowName, expected_convexity);
@@ -422,15 +424,17 @@ TEST_F(DepthSegmentationTest, testConvexity3) {
 
   float z_distance = kZMinDistance;
   cv::FileStorage points(
-      "/Users/ntonci/sandbox_melodic_ws/src/depth_segmentation/"
-      "depth_segmentation/test/data/test_3d_points.yaml",
+      "/media/mobmi/HDD/monstah_ws/src/depth_segmentation/depth_segmentation/"
+      "test/data/test_3d_points.yaml",
       cv::FileStorage::READ);
   points["points"] >> depth_map;
   // LOG(ERROR) << points["points"].operator std::string();
   cv::Mat normal_map(image_size, CV_32FC3);
-  params_.normals.window_size = 3u;
-  params_.min_convexity.window_size = 3u;
+  params_.normals.window_size = 5u;
+  params_.min_convexity.window_size = 5u;
+  params_.min_convexity.step_size = 1u;
   params_.normals.distance_factor_threshold = 0.05;
+  params_.min_convexity.use_morphological_opening = false;
   depth_segmenter_.computeNormalMap(depth_map, &normal_map);
 
   cv::Mat min_convexity_map(image_size, CV_32FC1);
