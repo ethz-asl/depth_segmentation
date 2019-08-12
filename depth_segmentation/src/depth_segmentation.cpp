@@ -511,14 +511,103 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
     cv::Mat difference_map(depth_map.size(), CV_32FC3);
     cv::filter2D(depth_map, difference_map, CV_32FC3, difference_kernel);
 
+    cv::namedWindow("difference_map", cv::WINDOW_AUTOSIZE);
+    cv::imshow("difference_map", difference_map);
+
+    // Compute projected normal_map.
+    cv::Mat z_direction_map(depth_map.size(), CV_32FC3,
+                            cv::Scalar(0.0, 0.0, 1.0));
+
+    std::vector<cv::Mat> z_cross_difference_channels(3);
+    cv::split(difference_map, z_cross_difference_channels);
+    z_cross_difference_channels[2].setTo(cv::Scalar(0.0f));
+    cv::Mat temp_storage = z_cross_difference_channels[0].clone();
+    z_cross_difference_channels[0] = -z_cross_difference_channels[1];
+    z_cross_difference_channels[1] = temp_storage;
+
+    cv::Mat normaliziation_factor(depth_map.size(), CV_32FC1);
+    normaliziation_factor =
+        z_cross_difference_channels[0].mul(z_cross_difference_channels[0]) +
+        z_cross_difference_channels[1].mul(z_cross_difference_channels[1]);
+    cv::sqrt(normaliziation_factor, normaliziation_factor);
+    cv::divide(z_cross_difference_channels[0], normaliziation_factor,
+               z_cross_difference_channels[0]);
+    cv::divide(z_cross_difference_channels[1], normaliziation_factor,
+               z_cross_difference_channels[1]);
+
+    cv::Mat z_cross_difference(depth_map.size(), CV_32FC3);
+    cv::merge(z_cross_difference_channels, z_cross_difference);
+
+    cv::namedWindow("z_cross_difference", cv::WINDOW_AUTOSIZE);
+    cv::imshow("z_cross_difference", cv::abs(-z_cross_difference));
+
+    cv::Mat normal_times_z_cross_difference(depth_map.size(), CV_32FC3);
+    normal_times_z_cross_difference = normal_map.mul(z_cross_difference);
+    std::vector<cv::Mat> distance_channels(3);
+    cv::split(normal_times_z_cross_difference, distance_channels);
+    cv::Mat distance_map(depth_map.size(), CV_32FC1);
+    distance_map =
+        distance_channels[0] + distance_channels[1] + distance_channels[2];
+
+    cv::Mat normal_projection_vector(depth_map.size(), CV_32FC3);
+    z_cross_difference_channels[0] =
+        z_cross_difference_channels[0].mul(distance_map);
+    z_cross_difference_channels[1] =
+        z_cross_difference_channels[1].mul(distance_map);
+    cv::merge(z_cross_difference_channels, normal_projection_vector);
+
+    cv::namedWindow("normal_projection_vector", cv::WINDOW_AUTOSIZE);
+    cv::imshow("normal_projection_vector", cv::abs(-normal_projection_vector));
+
+    cv::Mat projected_normal_map(depth_map.size(), CV_32FC3);
+    projected_normal_map = normal_map - normal_projection_vector;
+
+    cv::namedWindow("projected_normal_map_before", cv::WINDOW_AUTOSIZE);
+    cv::imshow("projected_normal_map_before", -projected_normal_map);
+
+    std::vector<cv::Mat> projected_normal_map_channels(3);
+    cv::split(projected_normal_map, projected_normal_map_channels);
+    cv::Mat projected_map_normaliziation_factor(projected_normal_map.size(),
+                                                CV_32FC1);
+    projected_map_normaliziation_factor =
+        projected_normal_map_channels[0].mul(projected_normal_map_channels[0]) +
+        projected_normal_map_channels[1].mul(projected_normal_map_channels[1]) +
+        projected_normal_map_channels[2].mul(projected_normal_map_channels[2]);
+    cv::sqrt(projected_map_normaliziation_factor,
+             projected_map_normaliziation_factor);
+    cv::divide(projected_normal_map_channels[0],
+               projected_map_normaliziation_factor,
+               projected_normal_map_channels[0]);
+    cv::divide(projected_normal_map_channels[1],
+               projected_map_normaliziation_factor,
+               projected_normal_map_channels[1]);
+    cv::divide(projected_normal_map_channels[2],
+               projected_map_normaliziation_factor,
+               projected_normal_map_channels[2]);
+    cv::merge(projected_normal_map_channels, projected_normal_map);
+
+    cv::namedWindow("projected_normal_map", cv::WINDOW_AUTOSIZE);
+    cv::imshow("projected_normal_map", -projected_normal_map);
+
+    cv::namedWindow("normal_map", cv::WINDOW_AUTOSIZE);
+    cv::imshow("normal_map", -normal_map);
+
     // Calculate the dot product over the three channels of difference_map and
     // normal_map.
     cv::Mat difference_times_normal(depth_map.size(), CV_32FC3);
-    difference_times_normal = difference_map.mul(-normal_map);
+    difference_times_normal = difference_map.mul(-projected_normal_map);
     std::vector<cv::Mat> channels(3);
     cv::split(difference_times_normal, channels);
     cv::Mat vector_projection(depth_map.size(), CV_32FC1);
     vector_projection = channels[0] + channels[1] + channels[2];
+
+    // cv::namedWindow("difference_times_normal", cv::WINDOW_AUTOSIZE);
+    // cv::imshow("difference_times_normal", difference_times_normal * 255);
+    //
+    // cv::namedWindow("vector_projection_neg", cv::WINDOW_AUTOSIZE);
+    // cv::imshow("vector_projection_neg", vector_projection <= 0);
+    // cv::namedWindow("vector_projection_pos", cv::WINDOW_AUTOSIZE);
+    // cv::imshow("vector_projection_pos", vector_projection > 0);
 
     // TODO(ff): Check if params_.min_convexity.mask_threshold should be
     // mid-point distance dependent.
@@ -540,32 +629,58 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
                   params_.min_convexity.mask_threshold, kMaxBinaryValue,
                   cv::THRESH_BINARY_INV);
 
+    cv::namedWindow("convexity_mask", cv::WINDOW_AUTOSIZE);
+    cv::imshow("convexity_mask", convexity_mask);
+    cv::namedWindow("concavity_mask", cv::WINDOW_AUTOSIZE);
+    cv::imshow("concavity_mask", concavity_mask);
+
     cv::Mat normal_kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32FC1);
     normal_kernel.at<float>(i) = 1.0f;
 
-    cv::Mat filtered_normal_image = cv::Mat::zeros(normal_map.size(), CV_32FC3);
-    cv::filter2D(normal_map, filtered_normal_image, CV_32FC3, normal_kernel);
-    normal_map.copyTo(filtered_normal_image,
-                      filtered_normal_image != filtered_normal_image);
+    cv::Mat filtered_normal_image =
+        cv::Mat::zeros(projected_normal_map.size(), CV_32FC3);
+    cv::filter2D(projected_normal_map, filtered_normal_image, CV_32FC3,
+                 normal_kernel);
+    projected_normal_map.copyTo(filtered_normal_image,
+                                filtered_normal_image != filtered_normal_image);
 
     // TODO(ff): Create a function for this mulitplication and projections.
     cv::Mat normal_times_filtered_normal(depth_map.size(), CV_32FC3);
-    normal_times_filtered_normal = normal_map.mul(filtered_normal_image);
+    normal_times_filtered_normal =
+        projected_normal_map.mul(filtered_normal_image);
     filtered_normal_image.copyTo(
         normal_times_filtered_normal,
         normal_times_filtered_normal != normal_times_filtered_normal);
     std::vector<cv::Mat> normal_channels(3);
     cv::split(normal_times_filtered_normal, normal_channels);
+
+    // cv::namedWindow("normal_times_filtered_normal", cv::WINDOW_AUTOSIZE);
+    // cv::imshow("normal_times_filtered_normal",
+    //            normal_times_filtered_normal * 255);
+
     cv::Mat normal_vector_projection(depth_map.size(), CV_32FC1);
     normal_vector_projection =
         normal_channels[0] + normal_channels[1] + normal_channels[2];
-    normal_vector_projection = concavity_mask.mul(normal_vector_projection);
+    normal_vector_projection =
+        concavity_mask.mul(cv::abs(normal_vector_projection));
 
-    cv::Mat convexity_map = cv::Mat::ones(depth_map.size(), CV_32FC1);
+    cv::namedWindow("normal_vector_projection", cv::WINDOW_AUTOSIZE);
+    cv::imshow("normal_vector_projection", normal_vector_projection);
+    //
+    // cv::namedWindow("sum_mask", cv::WINDOW_AUTOSIZE);
+    // cv::imshow("sum_mask", concavity_mask - normal_vector_projection);
+
+    cv::Mat convexity_map = cv::Mat::zeros(depth_map.size(), CV_32FC1);
     convexity_map = convexity_mask + normal_vector_projection;
 
     // Individually set the minimum pixel value of the two matrices.
     cv::min(*min_convexity_map, convexity_map, *min_convexity_map);
+
+    cv::namedWindow("MinIterConvexityMap", cv::WINDOW_AUTOSIZE);
+    cv::imshow("MinIterConvexityMap", *min_convexity_map);
+    cv::namedWindow("IterConvexityMap", cv::WINDOW_AUTOSIZE);
+    cv::imshow("IterConvexityMap", convexity_map);
+    cv::waitKey(0);
   }
 
   if (params_.min_convexity.use_threshold) {
@@ -1081,6 +1196,13 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
     depth_segmenter.computeNormalMap(rescaled_depth, normal_map);
   }
 
+  // Compute minimum convexity map.
+  cv::Mat convexity_map = cv::Mat::zeros(rescaled_depth.size(), CV_32FC1);
+  if (params.min_convexity.use_min_convexity) {
+    depth_segmenter.computeMinConvexityMap(depth_map, *normal_map,
+                                           &convexity_map);
+  }
+
   // Compute depth discontinuity map.
   cv::Mat discontinuity_map = cv::Mat::zeros(rescaled_depth.size(), CV_32FC1);
   if (params.depth_discontinuity.use_discontinuity) {
@@ -1092,13 +1214,6 @@ void segmentSingleFrame(const cv::Mat& rgb_image, const cv::Mat& depth_image,
   cv::Mat distance_map = cv::Mat::zeros(rescaled_depth.size(), CV_32FC1);
   if (params.max_distance.use_max_distance) {
     depth_segmenter.computeMaxDistanceMap(depth_map, &distance_map);
-  }
-
-  // Compute minimum convexity map.
-  cv::Mat convexity_map = cv::Mat::zeros(rescaled_depth.size(), CV_32FC1);
-  if (params.min_convexity.use_min_convexity) {
-    depth_segmenter.computeMinConvexityMap(depth_map, *normal_map,
-                                           &convexity_map);
   }
 
   // Compute final edge map.

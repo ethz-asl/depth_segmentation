@@ -163,7 +163,7 @@ void visualizeDepthMapWithNormals(const cv::Mat& depth_map,
   viz_3d->showWidget("cloud",
                      cv::viz::WCloud(depth_map, cv::viz::Color::red()));
   viz_3d->showWidget("normals",
-                     cv::viz::WCloudNormals(depth_map, normals, 50, 0.02f,
+                     cv::viz::WCloudNormals(depth_map, normals, 1, 0.02f,
                                             cv::viz::Color::green()));
   viz_3d->showWidget("coo", cv::viz::WCoordinateSystem(1.5));
   viz_3d->spinOnce(0, true);
@@ -307,19 +307,21 @@ void computeOwnNormals(const SurfaceNormalParams& params,
           normals->at<cv::Vec3f>(y, x)[coordinate] =
               eigenvectors.at<float>(n_th_eigenvector, coordinate);
         }
-        if (y == depth_map.rows / 2 - 1 || y == depth_map.rows / 2 ||
-            y == depth_map.rows / 2 + 1) {
-          if (x == depth_map.cols / 2 - 1 || x == depth_map.cols / 2 ||
-              x == depth_map.cols / 2 + 1) {
-            LOG(ERROR) << "x: " << x << " y: " << y
-                       << " p: " << depth_map.at<cv::Vec3f>(y, x) << "\n\n"
-                       << " neighborhood: " << neighborhood << " mean: " << mean
-                       << " covariance: " << covariance
-                       << " eigenvalues: " << eigenvalues
-                       << " eigenvectors: " << eigenvectors
-                       << " \n \n NORMALS: " << normals->at<cv::Vec3f>(y, x);
-          }
-        }
+        CHECK_NEAR(cv::norm(normals->at<cv::Vec3f>(y, x)), 1.0, 1e-5);
+        // if (y == depth_map.rows / 2 - 1 || y == depth_map.rows / 2 ||
+        //     y == depth_map.rows / 2 + 1) {
+        //   if (x == depth_map.cols / 2 - 1 || x == depth_map.cols / 2 ||
+        //       x == depth_map.cols / 2 + 1) {
+        //     LOG(ERROR) << "x: " << x << " y: " << y
+        //                << " p: " << depth_map.at<cv::Vec3f>(y, x) << "\n\n"
+        //                << " neighborhood: " << neighborhood << " mean: " <<
+        //                mean
+        //                << " covariance: " << covariance
+        //                << " eigenvalues: " << eigenvalues
+        //                << " eigenvectors: " << eigenvectors
+        //                << " \n \n NORMALS: " << normals->at<cv::Vec3f>(y, x);
+        //   }
+        // }
         // Re-Orient normals to point towards camera.
         if (normals->at<cv::Vec3f>(y, x)[2] > 0.0f) {
           normals->at<cv::Vec3f>(y, x) = -normals->at<cv::Vec3f>(y, x);

@@ -27,7 +27,7 @@ class DepthSegmentationTest : public ::testing::Test {
     params_.normals.distance_factor_threshold = 20.0;
     params_.min_convexity.use_threshold = false;
     params_.min_convexity.display = true;
-    params_.min_convexity.mask_threshold = 0.0;
+    params_.min_convexity.mask_threshold = -0.005;
 
     params_.depth_discontinuity.display = true;
     params_.final_edge.display = true;
@@ -321,7 +321,7 @@ TEST_F(DepthSegmentationTest, DISABLED_testConvexity) {
 }
 
 TEST_F(DepthSegmentationTest, DISABLED_testConvexity2) {
-  static constexpr size_t kNormalImageWidth = 640u;
+  static constexpr size_t kNormalImageWidth = 480u;
   static constexpr size_t kNormalImageHeight = 480u;
   cv::Size image_size(kNormalImageWidth, kNormalImageHeight);
   cv::Mat concave_normals(image_size, CV_32FC3);
@@ -390,7 +390,7 @@ TEST_F(DepthSegmentationTest, DISABLED_testConvexity2) {
   // EXPECT_EQ(cv::countNonZero(expected_convexity != min_convexity_map), 0);
 }
 
-TEST_F(DepthSegmentationTest, testConvexity2) {
+TEST_F(DepthSegmentationTest, testConvexity3) {
   static constexpr size_t kNormalImageWidth = 224u;
   static constexpr size_t kNormalImageHeight = 172u;
   cv::Size image_size(kNormalImageWidth, kNormalImageHeight);
@@ -422,13 +422,14 @@ TEST_F(DepthSegmentationTest, testConvexity2) {
 
   float z_distance = kZMinDistance;
   cv::FileStorage points(
-      "/media/mobmi/HDD/monstah_ws/src/depth_segmentation/depth_segmentation/"
-      "test/data/test_3d_points.yaml",
+      "/Users/ntonci/sandbox_melodic_ws/src/depth_segmentation/"
+      "depth_segmentation/test/data/test_3d_points.yaml",
       cv::FileStorage::READ);
   points["points"] >> depth_map;
   // LOG(ERROR) << points["points"].operator std::string();
   cv::Mat normal_map(image_size, CV_32FC3);
-  params_.normals.window_size = 11u;
+  params_.normals.window_size = 3u;
+  params_.min_convexity.window_size = 3u;
   params_.normals.distance_factor_threshold = 0.05;
   depth_segmenter_.computeNormalMap(depth_map, &normal_map);
 
