@@ -83,6 +83,7 @@ struct MinConvexityMapParams {
   bool use_morphological_opening = true;
   bool use_threshold = true;
   double threshold = 0.97;
+  double projection_threshold = 0.8;
   double mask_threshold = -0.0005;
 };
 

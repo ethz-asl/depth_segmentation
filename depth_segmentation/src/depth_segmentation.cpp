@@ -263,6 +263,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
       config.min_convexity_use_morphological_opening;
   params_.min_convexity.use_threshold = config.min_convexity_use_threshold;
   params_.min_convexity.threshold = config.min_convexity_threshold;
+  params_.min_convexity.projection_threshold =
+      config.min_convexity_projection_threshold;
   params_.min_convexity.mask_threshold = config.min_convexity_mask_threshold;
 
   params_.min_convexity.display = config.min_convexity_display;
@@ -555,8 +557,6 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
     cv::Mat distance_map(depth_map.size(), CV_32FC1);
     distance_map =
         distance_channels[0] + distance_channels[1] + distance_channels[2];
-    // TODO(ntonci): Check if needed.
-    // zeros.copyTo(distance_map, distance_map != distance_map);
 
     // Multiply the distances with the projection plane normals to scale the
     // projection vectors.
@@ -605,10 +605,10 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
 
     // TODO(ff): Check if params_.min_convexity.mask_threshold should be
     // mid-point distance dependent.
-    // maybe do something like:
-    std::vector<cv::Mat> depth_map_channels(3);
-    cv::split(depth_map, depth_map_channels);
-    vector_projection = vector_projection.mul(depth_map_channels[2]);
+    // std::vector<cv::Mat> depth_map_channels(3);
+    // cv::split(depth_map, depth_map_channels);
+    // cv::divide(vector_projection, depth_map_channels[2], vector_projection);
+    // vector_projection = vector_projection.mul(depth_map_channels[2]);
 
     // Split the projected vector images into convex and concave
     // regions/masks.
@@ -636,10 +636,6 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
     cv::Mat normal_times_filtered_normal(depth_map.size(), CV_32FC3);
     normal_times_filtered_normal =
         projected_normal_map.mul(filtered_normal_image);
-    // TODO(ntonci): Check if needed.
-    // filtered_normal_image.copyTo(
-    //     normal_times_filtered_normal,
-    //     normal_times_filtered_normal != normal_times_filtered_normal);
     std::vector<cv::Mat> normal_channels(3);
     cv::split(normal_times_filtered_normal, normal_channels);
     cv::Mat normal_vector_projection(depth_map.size(), CV_32FC1);
@@ -655,15 +651,14 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
     // of convexity.
     cv::Mat convexity_map = cv::Mat::zeros(depth_map.size(), CV_32FC1);
     convexity_map = convexity_mask + normal_vector_projection;
-    // TODO(ntonci): Check if needed.
-    // zeros.copyTo(convexity_map, convexity_map != convexity_map);
+    zeros.copyTo(convexity_map, convexity_map != convexity_map);
 
     // Wherever projected distance is large means that the original point
     // normal is almost perpendicular to the projection plane normal.
     // This means that the projected normal in that kernel direciton is not very
     // reliable for measuring convexity.
-    // TODO(ntonci): Make a param.
-    ones.copyTo(convexity_map, cv::abs(distance_map) > 0.8);
+    ones.copyTo(convexity_map, cv::abs(distance_map) >
+                                   params_.min_convexity.projection_threshold);
 
     // Individually set the minimum pixel value of the two
     // matrices.

@@ -33,6 +33,7 @@ max_distance_window_size: 1
 min_convexity_display: false
 min_convexity_mask_threshold: -0.0005
 min_convexity_morphological_opening_size: 1
+min_convexity_projection_threshold: 0.8
 min_convexity_step_size: 1
 min_convexity_threshold: 0.97
 min_convexity_use_min_convexity: true
