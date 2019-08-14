@@ -182,6 +182,7 @@ class DepthSegmenter {
   cv::rgbd::RgbdNormals rgbd_normals_;
   std::vector<cv::Scalar> colors_;
   std::vector<int> labels_;
+  cv::Mat display_image_;
 };
 
 // TODO(ntonci): Make a unit test.

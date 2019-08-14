@@ -164,9 +164,12 @@ void DepthSegmenter::initialize() {
   CHECK_EQ(params_.min_convexity.window_size % 2u, 1u);
 
   rgbd_normals_ = cv::rgbd::RgbdNormals(
-      depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32F,
+      depth_camera_.getHeight(), depth_camera_.getWidth(), CV_32F,
       depth_camera_.getCameraMatrix(), params_.normals.window_size,
       static_cast<int>(params_.normals.method));
+
+  display_image_ = cv::Mat(cv::Size(0, depth_camera_.getHeight()), CV_8UC3);
+
   LOG(INFO) << "DepthSegmenter initialized";
 }
 
@@ -341,10 +344,13 @@ void DepthSegmenter::computeDepthDiscontinuityMap(
                 cv::THRESH_BINARY);
 
   if (params_.depth_discontinuity.display) {
-    static const std::string kWindowName = "DepthDiscontinuityMap";
-    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
-    cv::imshow(kWindowName, *depth_discontinuity_map);
-    cv::waitKey(1);
+    cv::Mat uint_depth_discontinuity_map, float_depth_discontinuity_map;
+    cv::cvtColor(*depth_discontinuity_map, float_depth_discontinuity_map,
+                 CV_GRAY2RGB);
+    float_depth_discontinuity_map *= 255.0;
+    float_depth_discontinuity_map.convertTo(uint_depth_discontinuity_map,
+                                            CV_8UC3);
+    cv::hconcat(display_image_, uint_depth_discontinuity_map, display_image_);
   }
 }
 
@@ -435,10 +441,11 @@ void DepthSegmenter::computeMaxDistanceMap(const cv::Mat& depth_map,
     }
   }
   if (params_.max_distance.display) {
-    static const std::string kWindowName = "MaxDistanceMap";
-    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
-    cv::imshow(kWindowName, *max_distance_map);
-    cv::waitKey(1);
+    cv::Mat uint_max_distance_map, float_max_distance_map;
+    cv::cvtColor(*max_distance_map, float_max_distance_map, CV_GRAY2RGB);
+    float_max_distance_map *= 255.0;
+    float_max_distance_map.convertTo(uint_max_distance_map, CV_8UC3);
+    cv::hconcat(display_image_, uint_max_distance_map, display_image_);
   }
 }
 
@@ -461,12 +468,12 @@ void DepthSegmenter::computeNormalMap(const cv::Mat& depth_map,
     computeOwnNormals(params_.normals, depth_map, normal_map);
   }
   if (params_.normals.display) {
-    static const std::string kWindowName = "NormalMap";
-    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
-    // Taking the negative values of the normal map, as all normals point in
-    // negative z-direction.
-    cv::imshow(kWindowName, -*normal_map);
-    cv::waitKey(1);
+    cv::Mat uint_normal_map, float_normal_map;
+    float_normal_map = *normal_map * -255.0;
+    cv::Mat zeros = cv::Mat::zeros(float_normal_map.size(), CV_32FC3);
+    zeros.copyTo(float_normal_map, float_normal_map != float_normal_map);
+    float_normal_map.convertTo(uint_normal_map, CV_8UC3);
+    cv::hconcat(display_image_, uint_normal_map, display_image_);
   }
 }
 
@@ -684,10 +691,11 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
   }
 
   if (params_.min_convexity.display) {
-    static const std::string kWindowName = "MinConvexityMap";
-    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
-    cv::imshow(kWindowName, *min_convexity_map);
-    cv::waitKey(1);
+    cv::Mat uint_min_convexity_map, float_min_convexity_map;
+    cv::cvtColor(*min_convexity_map, float_min_convexity_map, CV_GRAY2RGB);
+    float_min_convexity_map *= 255.0;
+    float_min_convexity_map.convertTo(uint_min_convexity_map, CV_8UC3);
+    cv::hconcat(display_image_, uint_min_convexity_map, display_image_);
   }
 }
 
@@ -736,10 +744,11 @@ void DepthSegmenter::computeFinalEdgeMap(const cv::Mat& convexity_map,
 
   // TODO(ff): Perform morphological operations (also) on edge_map.
   if (params_.final_edge.display) {
-    static const std::string kWindowName = "FinalEdgeMap";
-    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
-    imshow(kWindowName, *edge_map);
-    cv::waitKey(1);
+    cv::Mat uint_edge_map, float_edge_map;
+    cv::cvtColor(*edge_map, float_edge_map, CV_GRAY2RGB);
+    float_edge_map *= 255.0;
+    float_edge_map.convertTo(uint_edge_map, CV_8UC3);
+    cv::hconcat(display_image_, uint_edge_map, display_image_);
   }
 }
 
@@ -1076,11 +1085,19 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   }
 
   if (params_.label.display) {
-    static const std::string kWindowName = "LabelMap";
-    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
-    imshow(kWindowName, output);
-    cv::waitKey(1);
+    cv::hconcat(display_image_, output, display_image_);
   }
+
+  if (params_.label.display || params_.normals.display ||
+      params_.depth_discontinuity.display || params_.max_distance.display ||
+      params_.min_convexity.display || params_.final_edge.display) {
+    static const std::string kWindowName = "SegmentationOutput";
+    cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
+    cv::imshow(kWindowName, display_image_);
+    cv::waitKey(1);
+    display_image_ = cv::Mat(cv::Size(0, depth_camera_.getHeight()), CV_8UC3);
+  }
+
   *labeled_map = output;
 }
 
