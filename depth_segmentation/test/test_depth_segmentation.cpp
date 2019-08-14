@@ -27,7 +27,7 @@ class DepthSegmentationTest : public ::testing::Test {
     params_.normals.distance_factor_threshold = 20.0;
     params_.min_convexity.use_threshold = false;
     params_.min_convexity.display = true;
-    params_.min_convexity.mask_threshold = -0.01;
+    params_.min_convexity.mask_threshold = -0.0001;
 
     params_.depth_discontinuity.display = true;
     params_.final_edge.display = true;
@@ -322,8 +322,8 @@ TEST_F(DepthSegmentationTest, testConvexity) {
 }
 
 TEST_F(DepthSegmentationTest, testConvexity2) {
-  static constexpr size_t kNormalImageWidth = 400u;
-  static constexpr size_t kNormalImageHeight = 400u;
+  static constexpr size_t kNormalImageWidth = 640u;
+  static constexpr size_t kNormalImageHeight = 480u;
   cv::Size image_size(kNormalImageWidth, kNormalImageHeight);
   cv::Mat depth_map(image_size, CV_32FC3);
   cv::Mat depth_image(image_size, CV_32FC1);
