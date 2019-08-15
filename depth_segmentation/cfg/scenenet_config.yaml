@@ -7,6 +7,10 @@ depth_discontinuity_display: true
 depth_discontinuity_kernel_size: 3
 depth_discontinuity_ratio: 0.03
 depth_discontinuity_use_depth_discontinuity: true
+dilate_depth_image: false
+dilation_size: 1
+display_rgb_image: false
+display_depth_image: false
 final_edge_display: false
 final_edge_morphological_closing_size: 1
 final_edge_morphological_opening_size: 1
@@ -30,12 +34,16 @@ max_distance_window_size: 1
 min_convexity_display: true
 min_convexity_mask_threshold: -0.0005
 min_convexity_morphological_opening_size: 1
+min_convexity_projection_threshold: 0.8
 min_convexity_step_size: 1
 min_convexity_threshold: 0.94
 min_convexity_use_morphological_opening: true
+min_convexity_use_projected_normals_for_convexity_condition: false
+min_convexity_use_projected_normals_for_convexity_measure: false
 min_convexity_use_threshold: true
 min_convexity_window_size: 5
 normals_display: true
 normals_distance_factor_threshold: 0.05
 normals_method: 3
 normals_window_size: 13
+visualize_segmented_scene: false

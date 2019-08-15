@@ -9,6 +9,8 @@ depth_discontinuity_ratio: 0.01
 depth_discontinuity_use_depth_discontinuity: true
 dilate_depth_image: false
 dilation_size: 1
+display_rgb_image: false
+display_depth_image: false
 final_edge_display: false
 final_edge_morphological_closing_size: 1
 final_edge_morphological_opening_size: 1
@@ -37,6 +39,8 @@ min_convexity_step_size: 1
 min_convexity_threshold: 0.97
 min_convexity_use_min_convexity: true
 min_convexity_use_morphological_opening: true
+min_convexity_use_projected_normals_for_convexity_condition: false
+min_convexity_use_projected_normals_for_convexity_measure: false
 min_convexity_use_threshold: true
 min_convexity_window_size: 5
 normals_display: false

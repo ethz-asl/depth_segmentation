@@ -83,7 +83,10 @@ struct MinConvexityMapParams {
   bool use_morphological_opening = true;
   bool use_threshold = true;
   double threshold = 0.97;
+  double projection_threshold = 0.8;
   double mask_threshold = -0.0005;
+  bool use_projected_normals_for_convexity_condition = false;
+  bool use_projected_normals_for_convexity_measure = false;
 };
 
 struct FinalEdgeMapParams {
@@ -137,6 +140,8 @@ struct Params {
   SurfaceNormalParams normals;
   SemanticInstanceSegmentationParams semantic_instance_segmentation;
   bool visualize_segmented_scene = false;
+  bool display_rgb_image = false;
+  bool display_depth_image = false;
 };
 
 void visualizeDepthMap(const cv::Mat& depth_map, cv::viz::Viz3d* viz_3d) {
@@ -163,7 +168,7 @@ void visualizeDepthMapWithNormals(const cv::Mat& depth_map,
   viz_3d->showWidget("cloud",
                      cv::viz::WCloud(depth_map, cv::viz::Color::red()));
   viz_3d->showWidget("normals",
-                     cv::viz::WCloudNormals(depth_map, normals, 50, 0.02f,
+                     cv::viz::WCloudNormals(depth_map, normals, 1, 0.02f,
                                             cv::viz::Color::green()));
   viz_3d->showWidget("coo", cv::viz::WCoordinateSystem(1.5));
   viz_3d->spinOnce(0, true);
@@ -196,6 +201,7 @@ void computeCovariance(const cv::Mat& neighborhood, const cv::Vec3f& mean,
   covariance->at<float>(1, 0) = covariance->at<float>(0, 1);
   covariance->at<float>(2, 0) = covariance->at<float>(0, 2);
   covariance->at<float>(2, 1) = covariance->at<float>(1, 2);
+  CHECK_GT(cv::countNonZero(*covariance), 0) << *covariance;
 }
 
 size_t findNeighborhood(const cv::Mat& depth_map, const size_t window_size,
@@ -306,6 +312,7 @@ void computeOwnNormals(const SurfaceNormalParams& params,
           normals->at<cv::Vec3f>(y, x)[coordinate] =
               eigenvectors.at<float>(n_th_eigenvector, coordinate);
         }
+        CHECK_NEAR(cv::norm(normals->at<cv::Vec3f>(y, x)), 1.0, 1e-5);
         // Re-Orient normals to point towards camera.
         if (normals->at<cv::Vec3f>(y, x)[2] > 0.0f) {
           normals->at<cv::Vec3f>(y, x) = -normals->at<cv::Vec3f>(y, x);

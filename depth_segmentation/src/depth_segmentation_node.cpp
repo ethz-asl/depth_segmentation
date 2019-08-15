@@ -136,10 +136,6 @@ class DepthSegmentationNode {
                                                          1000);
     point_cloud2_scene_pub_ =
         node_handle_.advertise<sensor_msgs::PointCloud2>("segmented_scene", 1);
-
-    node_handle_.param<bool>("visualize_segmented_scene",
-                             params_.visualize_segmented_scene,
-                             params_.visualize_segmented_scene);
   }
 
  private:
@@ -436,8 +432,8 @@ class DepthSegmentationNode {
       }
     }
 
-    *depth_map = cv::Mat::zeros(depth_camera_.getWidth(),
-                                depth_camera_.getHeight(), CV_32FC3);
+    *depth_map = cv::Mat::zeros(depth_camera_.getHeight(),
+                                depth_camera_.getWidth(), CV_32FC3);
     depth_segmenter_.computeDepthMap(rescaled_depth, depth_map);
 
     // Compute normal map.
@@ -458,30 +454,30 @@ class DepthSegmentationNode {
 
     // Compute depth discontinuity map.
     cv::Mat discontinuity_map = cv::Mat::zeros(
-        depth_camera_.getWidth(), depth_camera_.getHeight(), CV_32FC1);
+        depth_camera_.getHeight(), depth_camera_.getWidth(), CV_32FC1);
     if (params_.depth_discontinuity.use_discontinuity) {
       depth_segmenter_.computeDepthDiscontinuityMap(rescaled_depth,
                                                     &discontinuity_map);
     }
 
     // Compute maximum distance map.
-    cv::Mat distance_map = cv::Mat::zeros(depth_camera_.getWidth(),
-                                          depth_camera_.getHeight(), CV_32FC1);
+    cv::Mat distance_map = cv::Mat::zeros(depth_camera_.getHeight(),
+                                          depth_camera_.getWidth(), CV_32FC1);
     if (params_.max_distance.use_max_distance) {
       depth_segmenter_.computeMaxDistanceMap(*depth_map, &distance_map);
     }
 
     // Compute minimum convexity map.
-    cv::Mat convexity_map = cv::Mat::zeros(depth_camera_.getWidth(),
-                                           depth_camera_.getHeight(), CV_32FC1);
+    cv::Mat convexity_map = cv::Mat::zeros(depth_camera_.getHeight(),
+                                           depth_camera_.getWidth(), CV_32FC1);
     if (params_.min_convexity.use_min_convexity) {
       depth_segmenter_.computeMinConvexityMap(*depth_map, *normal_map,
                                               &convexity_map);
     }
 
     // Compute final edge map.
-    *edge_map = cv::Mat::zeros(depth_camera_.getWidth(),
-                               depth_camera_.getHeight(), CV_32FC1);
+    *edge_map = cv::Mat::zeros(depth_camera_.getHeight(),
+                               depth_camera_.getWidth(), CV_32FC1);
     depth_segmenter_.computeFinalEdgeMap(convexity_map, distance_map,
                                          discontinuity_map, edge_map);
   }
@@ -500,8 +496,8 @@ class DepthSegmentationNode {
           normal_map, edge_map;
       preprocess(depth_msg, rgb_msg, &rescaled_depth, &dilated_rescaled_depth,
                  cv_rgb_image, cv_depth_image, &bw_image, &mask);
-      if (!camera_tracker_.getRgbImage().empty() &&
-              !camera_tracker_.getDepthImage().empty() ||
+      if ((!camera_tracker_.getRgbImage().empty() &&
+           !camera_tracker_.getDepthImage().empty()) ||
           !depth_segmentation::kUseTracker) {
         computeEdgeMap(depth_msg, rgb_msg, dilated_rescaled_depth, cv_rgb_image,
                        cv_depth_image, bw_image, mask, &depth_map, &normal_map,
@@ -608,7 +604,7 @@ class DepthSegmentationNode {
     K_depth.at<float>(1, 2) = depth_info.K[5];
     K_depth.at<float>(2, 2) = depth_info.K[8];
 
-    depth_camera_.initialize(depth_image_size.x(), depth_image_size.y(),
+    depth_camera_.initialize(depth_image_size.y(), depth_image_size.x(),
                              CV_32FC1, K_depth);
 
     sensor_msgs::CameraInfo rgb_info;
@@ -622,7 +618,7 @@ class DepthSegmentationNode {
     K_rgb.at<float>(1, 2) = rgb_info.K[5];
     K_rgb.at<float>(2, 2) = rgb_info.K[8];
 
-    rgb_camera_.initialize(rgb_image_size.x(), rgb_image_size.y(), CV_8UC1,
+    rgb_camera_.initialize(rgb_image_size.y(), rgb_image_size.x(), CV_8UC1,
                            K_rgb);
 
     depth_segmenter_.initialize();
