@@ -136,15 +136,6 @@ class DepthSegmentationNode {
                                                          1000);
     point_cloud2_scene_pub_ =
         node_handle_.advertise<sensor_msgs::PointCloud2>("segmented_scene", 1);
-
-    node_handle_.param<bool>("visualize_segmented_scene",
-                             params_.visualize_segmented_scene,
-                             params_.visualize_segmented_scene);
-
-    node_handle_.param<bool>("display_rgb_image", params_.display_rgb_image,
-                             params_.display_rgb_image);
-    node_handle_.param<bool>("display_depth_image", params_.display_depth_image,
-                             params_.display_depth_image);
   }
 
  private:

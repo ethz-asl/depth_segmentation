@@ -33,6 +33,8 @@ min_convexity_projection_threshold: 0.8
 min_convexity_step_size: 1
 min_convexity_threshold: 0.94
 min_convexity_use_morphological_opening: true
+min_convexity_use_projected_normals_for_convexity_condition: false
+min_convexity_use_projected_normals_for_convexity_measure: false
 min_convexity_use_threshold: true
 min_convexity_window_size: 5
 normals_display: true

@@ -85,6 +85,8 @@ struct MinConvexityMapParams {
   double threshold = 0.97;
   double projection_threshold = 0.8;
   double mask_threshold = -0.0005;
+  bool use_projected_normals_for_convexity_condition = false;
+  bool use_projected_normals_for_convexity_measure = false;
 };
 
 struct FinalEdgeMapParams {

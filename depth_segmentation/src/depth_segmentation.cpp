@@ -276,6 +276,11 @@ void DepthSegmenter::dynamicReconfigureCallback(
   params_.min_convexity.display = config.min_convexity_display;
   params_.min_convexity.window_size = config.min_convexity_window_size;
 
+  params_.min_convexity.use_projected_normals_for_convexity_condition =
+      config.min_convexity_use_projected_normals_for_convexity_condition;
+  params_.min_convexity.use_projected_normals_for_convexity_measure =
+      config.min_convexity_use_projected_normals_for_convexity_measure;
+
   // Final edge map params.
   params_.final_edge.morphological_opening_size =
       config.final_edge_morphological_opening_size;
@@ -606,8 +611,15 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
 
     // Calculate the dot product over the three channels of difference vectors
     // and projected point normals.
+    cv::Mat convexity_condition_normal_map;
+    if (params_.min_convexity.use_projected_normals_for_convexity_condition) {
+      convexity_condition_normal_map = -projected_normal_map;
+    } else {
+      convexity_condition_normal_map = -normal_map;
+    }
     cv::Mat difference_times_normal(depth_map.size(), CV_32FC3);
-    difference_times_normal = difference_map.mul(-projected_normal_map);
+    difference_times_normal =
+        difference_map.mul(convexity_condition_normal_map);
     std::vector<cv::Mat> channels(3);
     cv::split(difference_times_normal, channels);
     cv::Mat vector_projection(depth_map.size(), CV_32FC1);
@@ -632,20 +644,27 @@ void DepthSegmenter::computeMinConvexityMap(const cv::Mat& depth_map,
                   params_.min_convexity.mask_threshold, kMaxBinaryValue,
                   cv::THRESH_BINARY_INV);
 
+    cv::Mat convexity_measure_normal_map;
+    if (params_.min_convexity.use_projected_normals_for_convexity_measure) {
+      convexity_measure_normal_map = projected_normal_map;
+    } else {
+      convexity_measure_normal_map = normal_map;
+    }
+
     // Get the projected point normal at current kernel point location (not the
     // anchor).
     cv::Mat normal_kernel = cv::Mat::zeros(kernel_size, kernel_size, CV_32FC1);
     normal_kernel.at<float>(i) = 1.0f;
     cv::Mat filtered_normal_image =
-        cv::Mat::zeros(projected_normal_map.size(), CV_32FC3);
-    cv::filter2D(projected_normal_map, filtered_normal_image, CV_32FC3,
+        cv::Mat::zeros(convexity_measure_normal_map.size(), CV_32FC3);
+    cv::filter2D(convexity_measure_normal_map, filtered_normal_image, CV_32FC3,
                  normal_kernel);
 
     // Obtain the dot product between the projected point normals at anchor and
     // other kernel point location.
     cv::Mat normal_times_filtered_normal(depth_map.size(), CV_32FC3);
     normal_times_filtered_normal =
-        projected_normal_map.mul(filtered_normal_image);
+        convexity_measure_normal_map.mul(filtered_normal_image);
     std::vector<cv::Mat> normal_channels(3);
     cv::split(normal_times_filtered_normal, normal_channels);
     cv::Mat normal_vector_projection(depth_map.size(), CV_32FC1);
