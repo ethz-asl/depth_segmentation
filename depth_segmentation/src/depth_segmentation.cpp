@@ -178,6 +178,9 @@ void DepthSegmenter::dynamicReconfigureCallback(
   // General params.
   params_.dilate_depth_image = config.dilate_depth_image;
   params_.dilation_size = config.dilation_size;
+  params_.visualize_segmented_scene = config.visualize_segmented_scene;
+  params_.display_rgb_image = config.display_rgb_image;
+  params_.display_depth_image = config.display_depth_image;
 
   // Surface normal params.
   if (config.normals_window_size % 2u != 1u) {
@@ -1091,6 +1094,26 @@ void DepthSegmenter::labelMap(const cv::Mat& rgb_image,
   if (params_.label.display || params_.normals.display ||
       params_.depth_discontinuity.display || params_.max_distance.display ||
       params_.min_convexity.display || params_.final_edge.display) {
+    if (params_.display_rgb_image) {
+      cv::Mat bgr_image;
+      cv::cvtColor(rgb_image, bgr_image, CV_RGB2BGR);
+      cv::hconcat(bgr_image, display_image_, display_image_);
+    }
+    if (params_.display_depth_image) {
+      cv::Mat rescaled_depth;
+      if (depth_image.type() == CV_16UC1) {
+        cv::rgbd::rescaleDepth(depth_image, CV_32FC1, rescaled_depth);
+      } else if (depth_image.type() != CV_32FC1) {
+        LOG(FATAL) << "Depth image is of unknown type.";
+      } else {
+        rescaled_depth = depth_image;
+      }
+      cv::Mat uint_depth_image, float_depth_image;
+      cv::cvtColor(rescaled_depth, float_depth_image, CV_GRAY2RGB);
+      float_depth_image *= 55.0;
+      float_depth_image.convertTo(uint_depth_image, CV_8UC3);
+      cv::hconcat(uint_depth_image, display_image_, display_image_);
+    }
     static const std::string kWindowName = "SegmentationOutput";
     cv::namedWindow(kWindowName, cv::WINDOW_AUTOSIZE);
     cv::imshow(kWindowName, display_image_);

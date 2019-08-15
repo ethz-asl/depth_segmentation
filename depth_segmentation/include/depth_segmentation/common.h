@@ -138,6 +138,8 @@ struct Params {
   SurfaceNormalParams normals;
   SemanticInstanceSegmentationParams semantic_instance_segmentation;
   bool visualize_segmented_scene = false;
+  bool display_rgb_image = false;
+  bool display_depth_image = false;
 };
 
 void visualizeDepthMap(const cv::Mat& depth_map, cv::viz::Viz3d* viz_3d) {

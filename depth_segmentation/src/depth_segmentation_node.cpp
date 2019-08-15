@@ -140,6 +140,11 @@ class DepthSegmentationNode {
     node_handle_.param<bool>("visualize_segmented_scene",
                              params_.visualize_segmented_scene,
                              params_.visualize_segmented_scene);
+
+    node_handle_.param<bool>("display_rgb_image", params_.display_rgb_image,
+                             params_.display_rgb_image);
+    node_handle_.param<bool>("display_depth_image", params_.display_depth_image,
+                             params_.display_depth_image);
   }
 
  private:
