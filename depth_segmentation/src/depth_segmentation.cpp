@@ -178,6 +178,8 @@ void DepthSegmenter::dynamicReconfigureCallback(
   // General params.
   params_.dilate_depth_image = config.dilate_depth_image;
   params_.dilation_size = config.dilation_size;
+  params_.median_filter_depth_image = config.median_filter_depth_image;
+  params_.median_filter_size = config.median_filter_size;
   params_.visualize_segmented_scene = config.visualize_segmented_scene;
   params_.display_rgb_image = config.display_rgb_image;
   params_.display_depth_image = config.display_depth_image;
