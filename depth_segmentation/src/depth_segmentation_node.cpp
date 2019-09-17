@@ -388,6 +388,11 @@ class DepthSegmentationNode {
       *dilated_rescaled_depth = *rescaled_depth;
     }
 
+    if (params_.median_filter_depth_image) {
+      cv::medianBlur(*dilated_rescaled_depth, *dilated_rescaled_depth,
+                     params_.median_filter_size);
+    }
+
     *bw_image = cv::Mat::zeros(cv_rgb_image->image.size(), CV_8UC1);
 
     cvtColor(cv_rgb_image->image, *bw_image, cv::COLOR_RGB2GRAY);

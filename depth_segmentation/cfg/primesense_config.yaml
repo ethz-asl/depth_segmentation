@@ -26,6 +26,8 @@ max_distance_sensor_noise_param_2nd_order: 0.0019
 max_distance_sensor_noise_param_3rd_order: 0.0001
 max_distance_use_threshold: true
 max_distance_window_size: 1
+median_filter_depth_image: false
+median_filter_size: 1
 min_convexity_display: true
 min_convexity_mask_threshold: -0.0005
 min_convexity_morphological_opening_size: 1
