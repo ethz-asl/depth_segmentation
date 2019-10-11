@@ -65,6 +65,9 @@ class DepthSegmentationNode {
 
     node_handle_.param<std::string>("depth_image_sub_topic", depth_image_topic_,
                                     depth_segmentation::kDepthImageTopic);
+    node_handle_.param<std::string>("scene_depth_image_sub_topic",
+                                    scene_depth_image_topic_,
+                                    depth_segmentation::kDepthImageTopic);
     node_handle_.param<std::string>("rgb_image_sub_topic", rgb_image_topic_,
                                     depth_segmentation::kRgbImageTopic);
     node_handle_.param<std::string>("depth_camera_info_sub_topic",
@@ -84,6 +87,8 @@ class DepthSegmentationNode {
 
     depth_image_sub_ = new image_transport::SubscriberFilter(
         image_transport_, depth_image_topic_, 1);
+    scene_depth_image_sub_ = new image_transport::SubscriberFilter(
+        image_transport_, scene_depth_image_topic_, 1);
     rgb_image_sub_ = new image_transport::SubscriberFilter(image_transport_,
                                                            rgb_image_topic_, 1);
     depth_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
@@ -118,10 +123,11 @@ class DepthSegmentationNode {
 #endif
     } else {
       image_sync_policy_ = new message_filters::Synchronizer<ImageSyncPolicy>(
-          ImageSyncPolicy(kQueueSize), *depth_image_sub_, *rgb_image_sub_);
+          ImageSyncPolicy(kQueueSize), *depth_image_sub_, *rgb_image_sub_,
+          *scene_depth_image_sub_);
 
       image_sync_policy_->registerCallback(
-          boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
+          boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2, _3));
     }
 
     camera_info_sync_policy_ =
@@ -136,6 +142,9 @@ class DepthSegmentationNode {
                                                          1000);
     point_cloud2_scene_pub_ =
         node_handle_.advertise<sensor_msgs::PointCloud2>("segmented_scene", 1);
+
+    point_cloud2_whole_scene_pub_ =
+        node_handle_.advertise<sensor_msgs::PointCloud2>("complete_scene", 1);
   }
 
  private:
@@ -143,8 +152,8 @@ class DepthSegmentationNode {
   image_transport::ImageTransport image_transport_;
   tf::TransformBroadcaster transform_broadcaster_;
 
-  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image,
-                                                          sensor_msgs::Image>
+  typedef message_filters::sync_policies::ApproximateTime<
+      sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::Image>
       ImageSyncPolicy;
 
 #ifdef MASKRCNNROS_AVAILABLE
@@ -171,12 +180,14 @@ class DepthSegmentationNode {
   std::string rgb_image_topic_;
   std::string rgb_camera_info_topic_;
   std::string depth_image_topic_;
+  std::string scene_depth_image_topic_;
   std::string depth_camera_info_topic_;
   std::string semantic_instance_segmentation_topic_;
   std::string world_frame_;
   std::string camera_frame_;
 
   image_transport::SubscriberFilter* depth_image_sub_;
+  image_transport::SubscriberFilter* scene_depth_image_sub_;
   image_transport::SubscriberFilter* rgb_image_sub_;
 
   message_filters::Subscriber<sensor_msgs::CameraInfo>* depth_info_sub_;
@@ -184,6 +195,7 @@ class DepthSegmentationNode {
 
   ros::Publisher point_cloud2_segment_pub_;
   ros::Publisher point_cloud2_scene_pub_;
+  ros::Publisher point_cloud2_whole_scene_pub_;
 
   message_filters::Synchronizer<ImageSyncPolicy>* image_sync_policy_;
 
@@ -220,6 +232,16 @@ class DepthSegmentationNode {
 
     transform_broadcaster_.sendTransform(tf::StampedTransform(
         transform, timestamp, camera_frame_, world_frame_));
+  }
+
+  void fillPoint(const cv::Vec3f& point, const cv::Vec3f& colors,
+                 pcl::PointSurfel* point_pcl) {
+    point_pcl->x = point[0];
+    point_pcl->y = point[1];
+    point_pcl->z = point[2];
+    point_pcl->r = colors[0];
+    point_pcl->g = colors[1];
+    point_pcl->b = colors[2];
   }
 
   void fillPoint(const cv::Vec3f& point, const cv::Vec3f& normals,
@@ -346,6 +368,63 @@ class DepthSegmentationNode {
     }
   }
 #endif
+
+  void preprocessSceneDepth(const sensor_msgs::Image::ConstPtr& scene_depth_msg,
+                            cv::Mat* rescaled_scene_depth,
+                            cv_bridge::CvImagePtr cv_scene_depth_image) {
+    CHECK_NOTNULL(rescaled_scene_depth);
+    CHECK_NOTNULL(cv_scene_depth_image);
+
+    if (scene_depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
+      cv_scene_depth_image = cv_bridge::toCvCopy(
+          scene_depth_msg, sensor_msgs::image_encodings::TYPE_16UC1);
+      *rescaled_scene_depth =
+          cv::Mat::zeros(cv_scene_depth_image->image.size(), CV_32FC1);
+      cv::rgbd::rescaleDepth(cv_scene_depth_image->image, CV_32FC1,
+                             *rescaled_scene_depth);
+    } else if (scene_depth_msg->encoding ==
+               sensor_msgs::image_encodings::TYPE_32FC1) {
+      cv_scene_depth_image = cv_bridge::toCvCopy(
+          scene_depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+      *rescaled_scene_depth = cv_scene_depth_image->image;
+    } else {
+      LOG(FATAL) << "Unknown depth image encoding.";
+    }
+
+    constexpr double kZeroValue = 0.0;
+    cv::Mat nan_mask = *rescaled_scene_depth != *rescaled_scene_depth;
+    rescaled_scene_depth->setTo(kZeroValue, nan_mask);
+  }
+
+  void publishSceneCloud(const cv::Mat rescaled_scene_depth,
+                         const cv::Mat rgb_image,
+                         const std_msgs::Header& header) {
+    cv::Mat original_scene_depth_map;
+    cv::rgbd::depthTo3d(rescaled_scene_depth, depth_camera_.getCameraMatrix(),
+                        original_scene_depth_map);
+
+    pcl::PointCloud<pcl::PointSurfel>::Ptr scene_cloud_pcl(
+        new pcl::PointCloud<pcl::PointSurfel>);
+    for (size_t x = 0u; x < original_scene_depth_map.cols; ++x) {
+      for (size_t y = 0u; y < original_scene_depth_map.rows; ++y) {
+        pcl::PointSurfel point_pcl;
+
+        cv::Vec3f point = original_scene_depth_map.at<cv::Vec3f>(y, x);
+        cv::Vec3b original_color = rgb_image.at<cv::Vec3b>(y, x);
+
+        fillPoint(point, original_color, &point_pcl);
+
+        scene_cloud_pcl->push_back(point_pcl);
+      }
+    }
+
+    sensor_msgs::PointCloud2 pcl2_msg;
+    pcl::toROSMsg(*scene_cloud_pcl, pcl2_msg);
+    pcl2_msg.header.stamp = header.stamp;
+    pcl2_msg.header.frame_id = header.frame_id;
+
+    point_cloud2_whole_scene_pub_.publish(pcl2_msg);
+  }
 
   void preprocess(const sensor_msgs::Image::ConstPtr& depth_msg,
                   const sensor_msgs::Image::ConstPtr& rgb_msg,
@@ -488,7 +567,8 @@ class DepthSegmentationNode {
   }
 
   void imageCallback(const sensor_msgs::Image::ConstPtr& depth_msg,
-                     const sensor_msgs::Image::ConstPtr& rgb_msg) {
+                     const sensor_msgs::Image::ConstPtr& rgb_msg,
+                     const sensor_msgs::Image::ConstPtr& scene_depth_msg) {
     if (camera_info_ready_) {
       cv_bridge::CvImagePtr cv_rgb_image(new cv_bridge::CvImage);
       cv_rgb_image = cv_bridge::toCvCopy(rgb_msg, rgb_msg->encoding);
@@ -496,11 +576,20 @@ class DepthSegmentationNode {
         cv::cvtColor(cv_rgb_image->image, cv_rgb_image->image, CV_BGR2RGB);
       }
 
+      cv_bridge::CvImagePtr cv_scene_depth_image(new cv_bridge::CvImage);
+      cv::Mat rescaled_scene_depth;
+      preprocessSceneDepth(scene_depth_msg, &rescaled_scene_depth,
+                           cv_scene_depth_image);
+
       cv_bridge::CvImagePtr cv_depth_image(new cv_bridge::CvImage);
       cv::Mat rescaled_depth, dilated_rescaled_depth, bw_image, mask, depth_map,
           normal_map, edge_map;
       preprocess(depth_msg, rgb_msg, &rescaled_depth, &dilated_rescaled_depth,
                  cv_rgb_image, cv_depth_image, &bw_image, &mask);
+
+      publishSceneCloud(rescaled_scene_depth, cv_rgb_image->image,
+                        scene_depth_msg->header);
+
       if ((!camera_tracker_.getRgbImage().empty() &&
            !camera_tracker_.getDepthImage().empty()) ||
           !depth_segmentation::kUseTracker) {
