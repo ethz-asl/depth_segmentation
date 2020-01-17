@@ -1,0 +1,4 @@
+depth_image_sub_topic: /camera/depth/image_rect_raw
+rgb_image_sub_topic: /camera/color/image_raw
+depth_camera_info_sub_topic: /camera/depth/camera_info
+rgb_camera_info_sub_topic: /camera/color/camera_info
