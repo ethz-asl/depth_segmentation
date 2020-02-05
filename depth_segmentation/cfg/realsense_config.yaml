@@ -1,4 +1,4 @@
-depth_discontinuity_display: true
+depth_discontinuity_display: false
 depth_discontinuity_kernel_size: 3
 depth_discontinuity_ratio: 0.05
 depth_discontinuity_use_depth_discontinuity: true
@@ -25,7 +25,7 @@ max_distance_sensor_noise_param_3rd_order: 0.0001
 max_distance_use_max_distance: true
 max_distance_use_threshold: true
 max_distance_window_size: 1
-min_convexity_display: true
+min_convexity_display: false
 min_convexity_mask_threshold: -0.0005
 min_convexity_morphological_opening_size: 1
 min_convexity_step_size: 1
@@ -34,7 +34,7 @@ min_convexity_use_min_convexity: true
 min_convexity_use_morphological_opening: true
 min_convexity_use_threshold: true
 min_convexity_window_size: 5
-normals_display: true
+normals_display: false
 normals_distance_factor_threshold: 0.05
 normals_method: 3
 normals_window_size: 13
