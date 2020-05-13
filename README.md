@@ -20,6 +20,11 @@ catkin config --cmake-args -DCMAKE_CXX_STANDARD=14 -DCMAKE_BUILD_TYPE=Release
 wstool init src
 ```
 
+**Note:** If you already have a catkin workspace, ensure that its devel space layout is merged. If you do `catkin config` in your workspace the output should include:
+```
+Devel Space Layout:          merged
+```
+
 Clone the `depth_segmentation` repository over HTTPS (no Github account required):
 ```bash
 cd $CATKIN_WS/src
