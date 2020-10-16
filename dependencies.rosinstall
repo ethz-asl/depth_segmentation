@@ -6,5 +6,5 @@
 - git: {local-name: iclcv_catkin, uri: 'git@github.com:ethz-asl/iclcv_catkin.git'}
 - git: {local-name: mask_rcnn_ros, uri: 'git@github.com:ethz-asl/mask_rcnn_ros.git'}
 - git: {local-name: opencv3_catkin, uri: 'git@github.com:ethz-asl/opencv3_catkin.git'}
-- git: {local-name: pcl_catkin, uri: 'git@github.com:ethz-asl/pcl_catkin.git', version: fix/pcl-1.9.1}
+- git: {local-name: pcl_catkin, uri: 'git@github.com:ethz-asl/pcl_catkin.git'}
 - git: {local-name: vision_opencv, uri: 'git@github.com:ethz-asl/vision_opencv.git'}
