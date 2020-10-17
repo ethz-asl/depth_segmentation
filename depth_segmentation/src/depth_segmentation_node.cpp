@@ -67,12 +67,7 @@ class DepthSegmentationNode {
                                     depth_segmentation::kDepthImageTopic);
     node_handle_.param<std::string>("rgb_image_sub_topic", rgb_image_topic_,
                                     depth_segmentation::kRgbImageTopic);
-    node_handle_.param<std::string>("depth_camera_info_sub_topic",
-                                    depth_camera_info_topic_,
-                                    depth_segmentation::kDepthCameraInfoTopic);
-    node_handle_.param<std::string>("rgb_camera_info_sub_topic",
-                                    rgb_camera_info_topic_,
-                                    depth_segmentation::kRgbCameraInfoTopic);
+
     node_handle_.param<std::string>(
         "semantic_instance_segmentation_sub_topic",
         semantic_instance_segmentation_topic_,
@@ -86,10 +81,6 @@ class DepthSegmentationNode {
         image_transport_, depth_image_topic_, 1);
     rgb_image_sub_ = new image_transport::SubscriberFilter(image_transport_,
                                                            rgb_image_topic_, 1);
-    depth_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
-        node_handle_, depth_camera_info_topic_, 1);
-    rgb_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
-        node_handle_, rgb_camera_info_topic_, 1);
 
     constexpr int kQueueSize = 30;
 
@@ -124,12 +115,29 @@ class DepthSegmentationNode {
           boost::bind(&DepthSegmentationNode::imageCallback, this, _1, _2));
     }
 
-    camera_info_sync_policy_ =
-        new message_filters::Synchronizer<CameraInfoSyncPolicy>(
-            CameraInfoSyncPolicy(kQueueSize), *depth_info_sub_, *rgb_info_sub_);
+    node_handle_.param<bool>("load_camera_info_from_ros_param_",
+                             load_camera_info_from_ros_param_,
+                             load_camera_info_from_ros_param_);
+    if (!loadCameraInfoFromRosParam()) {
+      node_handle_.param<std::string>(
+          "depth_camera_info_sub_topic", depth_camera_info_topic_,
+          depth_segmentation::kDepthCameraInfoTopic);
+      node_handle_.param<std::string>("rgb_camera_info_sub_topic",
+                                      rgb_camera_info_topic_,
+                                      depth_segmentation::kRgbCameraInfoTopic);
+      depth_info_sub_ =
+          new message_filters::Subscriber<sensor_msgs::CameraInfo>(
+              node_handle_, depth_camera_info_topic_, 1);
+      rgb_info_sub_ = new message_filters::Subscriber<sensor_msgs::CameraInfo>(
+          node_handle_, rgb_camera_info_topic_, 1);
+      camera_info_sync_policy_ =
+          new message_filters::Synchronizer<CameraInfoSyncPolicy>(
+              CameraInfoSyncPolicy(kQueueSize), *depth_info_sub_,
+              *rgb_info_sub_);
 
-    camera_info_sync_policy_->registerCallback(
-        boost::bind(&DepthSegmentationNode::cameraInfoCallback, this, _1, _2));
+      camera_info_sync_policy_->registerCallback(boost::bind(
+          &DepthSegmentationNode::cameraInfoCallback, this, _1, _2));
+    }
 
     point_cloud2_segment_pub_ =
         node_handle_.advertise<sensor_msgs::PointCloud2>("object_segment",
@@ -161,6 +169,7 @@ class DepthSegmentationNode {
       sensor_msgs::CameraInfo, sensor_msgs::CameraInfo>
       CameraInfoSyncPolicy;
 
+  bool load_camera_info_from_ros_param_;
   bool camera_info_ready_;
   depth_segmentation::DepthCamera depth_camera_;
   depth_segmentation::RgbCamera rgb_camera_;
@@ -589,6 +598,68 @@ class DepthSegmentationNode {
     }
   }
 #endif
+
+  bool loadCameraInfoFromRosParam() {
+    if (camera_info_ready_)
+      return true;
+    if (!load_camera_info_from_ros_param_)
+      return false;
+
+    bool camera_info_ready = true;
+    Eigen::Vector2d depth_image_size;
+    cv::Mat K_depth = cv::Mat::eye(3, 3, CV_32FC1);
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/depth/width", depth_image_size[0]);
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/depth/height", depth_image_size[1]);
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/depth/k00", K_depth.at<float>(0, 0));
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/depth/k02", K_depth.at<float>(0, 2));
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/depth/k11", K_depth.at<float>(1, 1));
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/depth/k12", K_depth.at<float>(1, 2));
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/depth/k22", K_depth.at<float>(2, 2));
+
+    Eigen::Vector2d rgb_image_size;
+    cv::Mat K_rgb = cv::Mat::eye(3, 3, CV_32FC1);
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/rgb/width", rgb_image_size[0]);
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/rgb/height", rgb_image_size[1]);
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/rgb/k00", K_rgb.at<float>(0, 0));
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/rgb/k02", K_rgb.at<float>(0, 2));
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/rgb/k11", K_rgb.at<float>(1, 1));
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/rgb/k12", K_rgb.at<float>(1, 2));
+    camera_info_ready &=
+        node_handle_.getParam("camera_info/rgb/k22", K_rgb.at<float>(2, 2));
+
+    if (!camera_info_ready) {
+      load_camera_info_from_ros_param_ = false;
+      ROS_WARN(
+          "Load_camera_info_from_ros_param is set true, but camera info failed "
+          "to get. Use camera_info topics instead");
+      return false;
+    } else {
+      depth_camera_.initialize(depth_image_size.x(), depth_image_size.y(),
+                               CV_32FC1, K_depth);
+      rgb_camera_.initialize(rgb_image_size.x(), rgb_image_size.y(), CV_32FC1,
+                             K_rgb);
+      depth_segmenter_.initialize();
+      camera_tracker_.initialize(
+          camera_tracker_.kCameraTrackerNames
+              [camera_tracker_.CameraTrackerType::kRgbdICPOdometry]);
+
+      camera_info_ready_ = camera_info_ready;
+      return true;
+    }
+  }
 
   void cameraInfoCallback(
       const sensor_msgs::CameraInfo::ConstPtr& depth_camera_info_msg,

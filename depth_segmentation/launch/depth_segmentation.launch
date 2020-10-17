@@ -1,9 +1,14 @@
 <launch>
   <arg name="depth_segmentation_params_file" default="$(find depth_segmentation)/cfg/primesense_config.yaml"/>
   <arg name="sensor_topics_file" default="$(find depth_segmentation)/cfg/primesense_topics.yaml"/>
+  <arg name="camera_info_file" default="$(find depth_segmentation)/cfg/primesense_camera_info.yaml"/>
+  <arg name="load_camera_info_from_ros_param" default="false"/>
 
   <node name="depth_segmentation_node" pkg="depth_segmentation" type="depth_segmentation_node" output="log">
     <rosparam command="load" file="$(arg sensor_topics_file)"/>
     <rosparam command="load" file="$(arg depth_segmentation_params_file)"/>
+    <param name="load_camera_info_from_ros_param" value="$(arg load_camera_info_from_ros_param)"/>
+    <rosparam command="load" file="$(arg camera_info_file)" if="$(arg load_camera_info_from_ros_param)"/>
+ 
   </node>
 </launch>
